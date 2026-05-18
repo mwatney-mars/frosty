@@ -4,58 +4,50 @@ import os
 from typing import List, Dict, Optional
 from greeclimate.discovery import Discovery
 from greeclimate.device import Device, DeviceInfo
-from .database import SessionLocal, DBDeviceName, get_all_saved_devices
+from .database import SessionLocal, DBDeviceName, get_all_saved_devices, add_saved_device, delete_saved_device
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class GreeManager:
     def __init__(self):
-        self.discovery = None
+        self._discovery = None
         self.devices: Dict[str, Device] = {} # Keyed by MAC
         self.device_info: Dict[str, DeviceInfo] = {} # Keyed by MAC
         self._last_scan_results: List[DeviceInfo] = []
 
+    def _get_discovery(self):
+        if self._discovery is None:
+            self._discovery = Discovery()
+        return self._discovery
+
     def get_custom_name(self, mac: str) -> Optional[str]:
         db = SessionLocal()
         try:
-            device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
-            return device.name if device else None
-        finally:
-            db.close()
-
-    def set_custom_name(self, mac: str, name: str):
-        db = SessionLocal()
-        try:
-            device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
-            if device:
-                device.name = name
-            else:
-                new_device = DBDeviceName(mac=mac, name=name)
-                db.add(new_device)
-            db.commit()
+            return get_device_name(db, mac)
         finally:
             db.close()
 
     async def discover_devices(self):
         """Background discovery to find and bind SAVED devices."""
-        logger.info("Running network scan for saved devices...")
+        logger.info("Running network scan for devices...")
         try:
-            if self.discovery is None:
-                self.discovery = Discovery()
-
+            discovery = self._get_discovery()
+            
             target_ips = []
             env_ips = os.getenv("GREE_IPS")
             if env_ips:
                 target_ips.extend([ip.strip() for ip in env_ips.split(",")])
 
             if target_ips:
-                await self.discovery.search_devices(broadcastAddrs=target_ips)
+                await discovery.search_devices(broadcastAddrs=target_ips)
             else:
-                await self.discovery.search_devices()
+                await discovery.search_devices()
 
-            await asyncio.sleep(4)
-            self._last_scan_results = self.discovery.devices
+            # Wait for responses to arrive
+            await asyncio.sleep(5)
+            self._last_scan_results = discovery.devices
+            logger.info(f"Scan complete. Found {len(self._last_scan_results)} total devices on network.")
             
             # Get saved MACs from DB
             db = SessionLocal()
@@ -74,13 +66,13 @@ class GreeManager:
                             self.device_info[info.mac] = info
                             logger.info(f"Bound to saved device {info.mac} at {info.ip}")
                         except Exception as e:
-                            logger.error(f"Failed to bind to {info.mac} at {info.ip}: {e}")
+                            logger.error(f"Failed to bind to saved device {info.mac} at {info.ip}: {e}")
         except Exception as e:
             logger.error(f"Discovery error: {e}")
 
     async def scan_for_new_devices(self) -> List[Dict]:
         """Scan and return devices NOT in the saved list."""
-        await self.discover_devices() # Refresh list
+        await self.discover_devices() # Refresh results
         
         db = SessionLocal()
         saved_devices = get_all_saved_devices(db)
@@ -95,31 +87,41 @@ class GreeManager:
                     "ip": info.ip,
                     "name": info.name or "Gree AC"
                 })
+        
+        logger.info(f"Returning {len(unsaved)} new devices to frontend.")
         return unsaved
 
     async def add_saved_device(self, mac: str, name: str):
         """Add a device to persistence and try to bind it."""
-        self.set_custom_name(mac, name)
+        db = SessionLocal()
+        try:
+            add_saved_device(db, mac, name)
+        finally:
+            db.close()
+            
         # Check if we saw it in the last scan
+        found = False
         for info in self._last_scan_results:
             if info.mac == mac:
+                found = True
                 device = Device(info)
                 try:
                     await device.bind()
                     self.devices[mac] = device
                     self.device_info[mac] = info
+                    logger.info(f"Successfully added and bound new device {mac}")
                 except Exception as e:
                     logger.error(f"Failed to bind newly added device {mac}: {e}")
                 break
+        
+        if not found:
+             logger.warning(f"Device {mac} not found in latest scan results, cannot bind immediately.")
 
     async def remove_saved_device(self, mac: str):
         """Remove device from persistence and in-memory tracking."""
         db = SessionLocal()
         try:
-            device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
-            if device:
-                db.delete(device)
-                db.commit()
+            delete_saved_device(db, mac)
         finally:
             db.close()
         
@@ -140,7 +142,7 @@ class GreeManager:
                 "mac": mac,
                 "name": custom_name,
                 "online": False,
-                "ip": "Unknown"
+                "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown"
             }
         
         try:
@@ -181,10 +183,12 @@ class GreeManager:
         saved_devices = get_all_saved_devices(db)
         db.close()
         
+        if not saved_devices:
+            return []
+
         tasks = [self.get_device_state(d.mac) for d in saved_devices]
         states = await asyncio.gather(*tasks)
         
-        # Filter out None results and return
         return [s for s in states if s is not None]
 
     async def update_device(self, mac: str, updates: Dict):
@@ -192,7 +196,11 @@ class GreeManager:
         device = self.devices.get(mac)
         if "name" in updates:
             new_name = updates.pop("name")
-            self.set_custom_name(mac, new_name)
+            db = SessionLocal()
+            try:
+                add_saved_device(db, mac, new_name)
+            finally:
+                db.close()
         
         if device:
             for key, value in updates.items():
@@ -203,23 +211,5 @@ class GreeManager:
             
             if updates:
                 await device.push_state_update()
-
-    async def set_power(self, mac: str, power: bool):
-        device = self.devices.get(mac)
-        if device:
-            device.power = power
-            await device.push_state_update()
-
-    async def set_temperature(self, mac: str, temp: int):
-        device = self.devices.get(mac)
-        if device:
-            device.target_temperature = temp
-            await device.push_state_update()
-
-    async def set_fan_speed(self, mac: str, speed: int):
-        device = self.devices.get(mac)
-        if device:
-            device.fan_speed = speed
-            await device.push_state_update()
 
 gree_manager = GreeManager()

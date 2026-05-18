@@ -32,6 +32,10 @@ class DBDeviceName(Base):
 def get_all_saved_devices(db):
     return db.query(DBDeviceName).all()
 
+def get_device_name(db, mac):
+    device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
+    return device.name if device else None
+
 def add_saved_device(db, mac, name):
     device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
     if device:

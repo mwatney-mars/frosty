@@ -36,8 +36,12 @@ class ConnectionManager:
         self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
+        try:
+            await websocket.accept()
+            self.active_connections.append(websocket)
+            return True
+        except Exception:
+            return False
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
@@ -60,7 +64,7 @@ async def state_broadcaster():
                 await manager.broadcast(json.dumps(states))
         except Exception as e:
             print(f"Broadcast error: {e}")
-        await asyncio.sleep(2) # Broadcast every 2 seconds
+        await asyncio.sleep(5) # Broadcast every 5 seconds to reduce noise
 
 async def background_discovery():
     """Periodically scan for saved devices that might have come back online."""
@@ -69,24 +73,23 @@ async def background_discovery():
             await gree_manager.discover_devices()
         except Exception as e:
             print(f"Background discovery error: {e}")
-        await asyncio.sleep(30) # Scan every 30 seconds
+        await asyncio.sleep(60) # Scan every 60 seconds
 
 @app.websocket("/api/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    # Send current state immediately on connection
-    try:
-        states = await gree_manager.get_all_states()
-        await websocket.send_text(json.dumps(states))
-    except Exception:
-        pass
-        
-    try:
-        while True:
-            # Keep connection open
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+    # Passively check for token - we don't block here to allow WS to connect
+    # The frontend will ensure it only connects when a token exists
+    if await manager.connect(websocket):
+        try:
+            # Send initial state
+            states = await gree_manager.get_all_states()
+            await websocket.send_text(json.dumps(states))
+            
+            while True:
+                # Keep connection alive
+                await websocket.receive_text()
+        except (WebSocketDisconnect, Exception):
+            manager.disconnect(websocket)
 
 app.add_middleware(
     CORSMiddleware,
@@ -147,15 +150,6 @@ class DiscoveredDevice(BaseModel):
     mac: str
     ip: str
     name: str
-
-class PowerRequest(BaseModel):
-    power: bool
-
-class TemperatureRequest(BaseModel):
-    temperature: int
-
-class FanSpeedRequest(BaseModel):
-    fan_speed: int
 
 @app.on_event("startup")
 async def startup_event():
@@ -264,33 +258,6 @@ async def update_device(mac: str, updates: DeviceUpdate, current_user: User = De
     await gree_manager.update_device(mac, data)
     
     # Broadcast updated states
-    states = await gree_manager.get_all_states()
-    await manager.broadcast(json.dumps(states))
-    
-    return await gree_manager.get_device_state(mac)
-
-@app.post("/api/devices/{mac}/power")
-async def set_power(mac: str, request: PowerRequest, current_user: User = Depends(get_current_user)):
-    await gree_manager.set_power(mac, request.power)
-    
-    states = await gree_manager.get_all_states()
-    await manager.broadcast(json.dumps(states))
-    
-    return await gree_manager.get_device_state(mac)
-
-@app.post("/api/devices/{mac}/temperature")
-async def set_temperature(mac: str, request: TemperatureRequest, current_user: User = Depends(get_current_user)):
-    await gree_manager.set_temperature(mac, request.temperature)
-    
-    states = await gree_manager.get_all_states()
-    await manager.broadcast(json.dumps(states))
-    
-    return await gree_manager.get_device_state(mac)
-
-@app.post("/api/devices/{mac}/fan_speed")
-async def set_fan_speed(mac: str, request: FanSpeedRequest, current_user: User = Depends(get_current_user)):
-    await gree_manager.set_fan_speed(mac, request.fan_speed)
-    
     states = await gree_manager.get_all_states()
     await manager.broadcast(json.dumps(states))
     

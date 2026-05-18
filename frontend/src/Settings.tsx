@@ -28,7 +28,7 @@ function cn(...inputs: ClassValue[]) {
 type ViewState = 'menu' | 'devices';
 
 export default function Settings() {
-  const { devices, loading, error, setError, refreshDevices } = useDevices();
+  const { devices, initialized, error, setError, refreshDevices } = useDevices();
   const [view, setView] = useState<ViewState>('menu');
   const [discovered, setDiscovered] = useState<DiscoveredDevice[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -153,7 +153,7 @@ export default function Settings() {
               </div>
 
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
-                {loading && devices.length === 0 ? (
+                {!initialized ? (
                   <div className="p-10 text-center text-slate-500 italic">Loading saved devices...</div>
                 ) : devices.length === 0 ? (
                   <div className="p-10 text-center">

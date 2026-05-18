@@ -14,6 +14,7 @@ env/
 # Environment variables
 .env
 .env.local
+.secret_key
 
 # IDEs
 .vscode/

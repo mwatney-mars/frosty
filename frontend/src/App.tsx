@@ -67,13 +67,22 @@ const TOGGLES = [
 ] as const;
 
 export default function App() {
-  const { devices, user, setUser, loading, error, setError, refreshDevices } = useDevices();
+  const { 
+    devices, 
+    user, 
+    setUser, 
+    initialized, 
+    showOnboarding, 
+    finishOnboarding,
+    error, 
+    setError, 
+    refreshDevices 
+  } = useDevices();
   
   const [scanning, setScanning] = useState(false);
   const [selectedMac, setSelectedMac] = useState<string | null>(null);
   const [discovered, setDiscovered] = useState<DiscoveredDevice[]>([]);
   const [addingMacs, setAddingMacs] = useState<Set<string>>(new Set());
-  const [showOnboarding, setShowOnboarding] = useState(false);
   
   const { isDark, toggleTheme } = useTheme();
 
@@ -82,6 +91,7 @@ export default function App() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
+  // Handle device selection
   useEffect(() => {
     if (devices.length > 0 && !selectedMac) {
       setSelectedMac(devices[0].mac);
@@ -91,12 +101,6 @@ export default function App() {
       }
     }
   }, [devices, selectedMac]);
-
-  useEffect(() => {
-    if (!loading && devices.length === 0) {
-      setShowOnboarding(true);
-    }
-  }, [loading, devices.length]);
 
   const handleInitialDiscover = async () => {
     setScanning(true);
@@ -116,6 +120,7 @@ export default function App() {
     try {
       await saveDevice(device.mac, device.name, device.ip);
       setDiscovered(prev => prev.filter(d => d.mac !== device.mac));
+      // Manual internal state update during onboarding
       await refreshDevices();
     } catch (err) {
       alert('Failed to add device');
@@ -136,8 +141,6 @@ export default function App() {
   const updateSetting = async (mac: string, updates: Partial<DeviceState>) => {
     try {
       await updateDevice(mac, updates);
-      // Let WS handle the state update for global sync, 
-      // but we can also trigger a silent background refresh
       refreshDevices();
     } catch (err) {
       setError('Failed to update device settings');
@@ -258,7 +261,7 @@ export default function App() {
           </div>
         )}
 
-        {loading && devices.length === 0 ? (
+        {!initialized ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4 text-slate-400">
                <RefreshCw className="w-10 h-10 animate-spin" />
@@ -321,7 +324,10 @@ export default function App() {
 
                 {devices.length > 0 && (
                   <button 
-                    onClick={() => setShowOnboarding(false)}
+                    onClick={() => {
+                        console.log('[Onboarding Trace] Manual "Finish Setup" clicked');
+                        finishOnboarding();
+                    }}
                     className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-green-200 dark:shadow-none active:scale-[0.98]"
                   >
                     Finish Setup ({devices.length} Added)

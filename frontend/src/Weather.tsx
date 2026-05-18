@@ -14,7 +14,7 @@ export default function WeatherWidget() {
         setWeather({
           temp: weatherData.current.temperature_2m,
           isDay: weatherData.current.is_day,
-          city: 'Current Location'
+          city: 'Local Weather'
         });
       } catch (err) {
         console.error("Failed to fetch weather", err);
@@ -23,7 +23,9 @@ export default function WeatherWidget() {
       }
     }
 
-    if ("geolocation" in navigator) {
+    const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (isSecure && "geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           fetchWeather(position.coords.latitude, position.coords.longitude);
@@ -35,7 +37,8 @@ export default function WeatherWidget() {
         { timeout: 10000 }
       );
     } else {
-      fetchWeather(51.5074, -0.1278); // Fallback to London
+      // Insecure origin or no geolocation, use London fallback silently
+      fetchWeather(51.5074, -0.1278);
     }
   }, []);
 
