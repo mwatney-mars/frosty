@@ -1,5 +1,7 @@
 # Frosty ❄️
 
+> ⚠️ **Disclaimer:** This app is "vibe coded" and should be used with caution.
+
 A modern, responsive web controller for Gree Air Conditioning units.
 
 Frosty gives you a beautiful dashboard to control all your Gree AC units from any device. It features real-time state synchronization, a sleek grid UI, Dark Mode, and Progressive Web App (PWA) support.
