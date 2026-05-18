@@ -1,5 +1,6 @@
 import os
 import bcrypt
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional, List
 from jose import JWTError, jwt
@@ -9,7 +10,38 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from .database import get_db, DBUser
 
-SECRET_KEY = os.getenv("SECRET_KEY", "frosty-secret-key-change-me-in-production")
+def get_secret_key():
+    # 1. Try Environment Variable (Override)
+    env_key = os.getenv("SECRET_KEY")
+    if env_key:
+        return env_key
+    
+    # 2. Try to read from data folder
+    db_path = os.getenv("DB_PATH", "frosty.db")
+    data_dir = os.path.dirname(db_path)
+    if not data_dir:
+        data_dir = "."
+    
+    key_path = os.path.join(data_dir, ".secret_key")
+    
+    if os.path.exists(key_path):
+        with open(key_path, "r") as f:
+            return f.read().strip()
+    
+    # 3. Generate new key and save it
+    new_key = secrets.token_urlsafe(64)
+    try:
+        os.makedirs(data_dir, exist_ok=True)
+        with open(key_path, "w") as f:
+            f.write(new_key)
+    except Exception as e:
+        print(f"Warning: Could not save secret key to {key_path}: {e}")
+        # Fallback to default for compatibility, though not ideal
+        return "frosty-secret-key-change-me-in-production"
+        
+    return new_key
+
+SECRET_KEY = get_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 week
 

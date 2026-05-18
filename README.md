@@ -35,7 +35,6 @@ services:
     volumes:
       - ./frosty-data:/app/data
     environment:
-      - SECRET_KEY=change_this_to_a_secure_random_string
       # Optional: Explicitly define IPs if UDP broadcast isn't working
       # - GREE_IPS=192.168.1.100,192.168.1.101
 ```
