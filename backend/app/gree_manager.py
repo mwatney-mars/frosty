@@ -4,7 +4,7 @@ import os
 from typing import List, Dict, Optional
 from greeclimate.discovery import Discovery
 from greeclimate.device import Device, DeviceInfo
-from .database import SessionLocal, DBDeviceName, get_all_saved_devices, add_saved_device, delete_saved_device
+from .database import SessionLocal, DBDeviceName, get_all_saved_devices, add_saved_device, delete_saved_device, get_device_name
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
