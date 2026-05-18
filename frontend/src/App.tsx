@@ -19,21 +19,19 @@ import {
   Settings
 } from 'lucide-react';
 import { 
-  fetchDevices, 
   discoverDevices, 
   updateDevice, 
   logout, 
-  fetchMe, 
   updateUserInfo, 
   saveDevice,
   type DeviceState, 
-  type User, 
   type DiscoveredDevice 
 } from './api';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './ThemeProvider';
+import { useDevices } from './DeviceContext';
 import WeatherWidget from './Weather';
 
 function cn(...inputs: ClassValue[]) {
@@ -69,13 +67,13 @@ const TOGGLES = [
 ] as const;
 
 export default function App() {
-  const [devices, setDevices] = useState<DeviceState[]>([]);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { devices, user, setUser, loading, error, setError, refreshDevices } = useDevices();
+  
   const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedMac, setSelectedMac] = useState<string | null>(null);
   const [discovered, setDiscovered] = useState<DiscoveredDevice[]>([]);
+  const [addingMacs, setAddingMacs] = useState<Set<string>>(new Set());
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   const { isDark, toggleTheme } = useTheme();
 
@@ -94,32 +92,11 @@ export default function App() {
     }
   }, [devices, selectedMac]);
 
-  const loadInitialData = async () => {
-    try {
-      const [devicesData, userData] = await Promise.all([
-        fetchDevices(),
-        fetchMe()
-      ]);
-      setDevices(devicesData);
-      setUser(userData);
-      setError(null);
-    } catch (err: any) {
-      if (err.message !== 'Unauthorized') {
-        setError('Failed to load data. Is the backend running?');
-      }
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!loading && devices.length === 0) {
+      setShowOnboarding(true);
     }
-  };
-
-  const loadDevices = async () => {
-    try {
-      const data = await fetchDevices();
-      setDevices(data);
-    } catch (err: any) {
-      // Background reload failures are handled silently
-    }
-  };
+  }, [loading, devices.length]);
 
   const handleInitialDiscover = async () => {
     setScanning(true);
@@ -135,12 +112,19 @@ export default function App() {
   };
 
   const handleAddInitial = async (device: DiscoveredDevice) => {
+    setAddingMacs(prev => new Set(prev).add(device.mac));
     try {
       await saveDevice(device.mac, device.name, device.ip);
       setDiscovered(prev => prev.filter(d => d.mac !== device.mac));
-      await loadDevices();
+      await refreshDevices();
     } catch (err) {
       alert('Failed to add device');
+    } finally {
+      setAddingMacs(prev => {
+        const next = new Set(prev);
+        next.delete(device.mac);
+        return next;
+      });
     }
   };
 
@@ -149,38 +133,14 @@ export default function App() {
     navigate('/login');
   };
 
-  useEffect(() => {
-    loadInitialData();
-    
-    // Setup WebSocket for real-time updates
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/ws`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        setDevices(data);
-      } catch (e) {
-        console.error("Failed to parse WS message", e);
-      }
-    };
-
-    ws.onclose = () => console.log('WebSocket disconnected');
-
-    return () => {
-      ws.close();
-    };
-  }, []);
-
   const updateSetting = async (mac: string, updates: Partial<DeviceState>) => {
     try {
-      setDevices(current => current.map(d => d.mac === mac ? { ...d, ...updates } : d));
       await updateDevice(mac, updates);
-      await loadDevices();
+      // Let WS handle the state update for global sync, 
+      // but we can also trigger a silent background refresh
+      refreshDevices();
     } catch (err) {
       setError('Failed to update device settings');
-      await loadDevices();
     }
   };
 
@@ -298,7 +258,14 @@ export default function App() {
           </div>
         )}
 
-        {devices.length === 0 && !loading ? (
+        {loading && devices.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4 text-slate-400">
+               <RefreshCw className="w-10 h-10 animate-spin" />
+               <p className="font-medium">Connecting to Frosty...</p>
+            </div>
+          </div>
+        ) : showOnboarding ? (
           <div className="flex-1 flex flex-col items-center justify-center py-12">
             <div className="text-center max-w-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-8 md:p-12 rounded-3xl shadow-xl">
               <div className="bg-indigo-50 dark:bg-indigo-900/20 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8">
@@ -322,9 +289,15 @@ export default function App() {
                         </div>
                         <button 
                           onClick={() => handleAddInitial(d)}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+                          disabled={addingMacs.has(d.mac)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
-                          Add
+                          {addingMacs.has(d.mac) ? (
+                            <>
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              <span>Adding...</span>
+                            </>
+                          ) : 'Add'}
                         </button>
                       </div>
                     ))}
@@ -332,13 +305,29 @@ export default function App() {
                 </div>
               ) : null}
 
-              <button 
-                onClick={handleInitialDiscover}
-                disabled={scanning}
-                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none active:scale-[0.98] disabled:opacity-50"
-              >
-                {scanning ? 'Searching...' : 'Scan for Devices'}
-              </button>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleInitialDiscover}
+                  disabled={scanning}
+                  className={cn(
+                    "w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg active:scale-[0.98] disabled:opacity-50",
+                    discovered.length > 0 
+                      ? "bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white hover:bg-slate-50"
+                      : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200 dark:shadow-none"
+                  )}
+                >
+                  {scanning ? 'Searching...' : (discovered.length > 0 ? 'Scan Again' : 'Scan for Devices')}
+                </button>
+
+                {devices.length > 0 && (
+                  <button 
+                    onClick={() => setShowOnboarding(false)}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-green-200 dark:shadow-none active:scale-[0.98]"
+                  >
+                    Finish Setup ({devices.length} Added)
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ) : (

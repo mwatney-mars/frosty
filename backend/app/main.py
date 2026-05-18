@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, status, WebSocket, WebSocketDisconnect
+from fastapi.security import OAuth2PasswordRequestForm
 import json
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,9 +62,25 @@ async def state_broadcaster():
             print(f"Broadcast error: {e}")
         await asyncio.sleep(2) # Broadcast every 2 seconds
 
+async def background_discovery():
+    """Periodically scan for saved devices that might have come back online."""
+    while True:
+        try:
+            await gree_manager.discover_devices()
+        except Exception as e:
+            print(f"Background discovery error: {e}")
+        await asyncio.sleep(30) # Scan every 30 seconds
+
 @app.websocket("/api/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
+    # Send current state immediately on connection
+    try:
+        states = await gree_manager.get_all_states()
+        await websocket.send_text(json.dumps(states))
+    except Exception:
+        pass
+        
     try:
         while True:
             # Keep connection open
@@ -143,12 +160,21 @@ class FanSpeedRequest(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     import asyncio
-    asyncio.create_task(gree_manager.discover_devices())
+    async def run_initial_discovery():
+        await gree_manager.discover_devices()
+        # Broadcast immediately after initial discovery finishes
+        try:
+            states = await gree_manager.get_all_states()
+            await manager.broadcast(json.dumps(states))
+        except Exception:
+            pass
+
+    asyncio.create_task(run_initial_discovery())
     asyncio.create_task(state_broadcaster())
+    asyncio.create_task(background_discovery())
 
 @app.post("/api/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    from fastapi.security import OAuth2PasswordRequestForm
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -161,9 +187,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
-
-# Need to fix OAuth2PasswordRequestForm import
-from fastapi.security import OAuth2PasswordRequestForm
 
 @app.get("/api/users/me", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_user)):

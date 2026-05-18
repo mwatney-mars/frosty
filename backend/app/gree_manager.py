@@ -176,17 +176,16 @@ class GreeManager:
             }
 
     async def get_all_states(self) -> List[Dict]:
-        """Get states for all SAVED devices."""
+        """Get states for all SAVED devices in parallel."""
         db = SessionLocal()
         saved_devices = get_all_saved_devices(db)
         db.close()
         
-        states = []
-        for d in saved_devices:
-            state = await self.get_device_state(d.mac)
-            if state:
-                states.append(state)
-        return states
+        tasks = [self.get_device_state(d.mac) for d in saved_devices]
+        states = await asyncio.gather(*tasks)
+        
+        # Filter out None results and return
+        return [s for s in states if s is not None]
 
     async def update_device(self, mac: str, updates: Dict):
         """Update multiple properties of a device at once."""

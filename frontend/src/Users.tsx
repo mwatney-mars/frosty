@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { fetchUsers, createUser, deleteUser, updateUserInfo, type User } from './api';
-import { UserPlus, Trash2, Shield, User as UserIcon, X, Check, Lock, ChevronLeft, Info } from 'lucide-react';
+import { 
+  UserPlus, 
+  Trash2, 
+  Shield, 
+  User as UserIcon, 
+  X, 
+  Check, 
+  Lock, 
+  ChevronLeft, 
+  Info,
+  RefreshCw
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -11,6 +22,7 @@ function cn(...inputs: ClassValue[]) {
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newUsername, setNewUsername] = useState('');
@@ -22,10 +34,13 @@ export default function Users() {
 
   const loadUsers = async () => {
     try {
+      setLoading(true);
       const data = await fetchUsers();
       setUsers(data);
     } catch (err) {
       setError('Failed to load users');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -75,7 +90,7 @@ export default function Users() {
         <header className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/settings')}
               className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
             >
               <ChevronLeft className="w-6 h-6" />
@@ -130,7 +145,7 @@ export default function Users() {
                   placeholder="••••••••"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end pb-2">
                 <label className="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors w-full">
                   <div 
                     onClick={() => setNewIsAdmin(!newIsAdmin)}
@@ -164,7 +179,12 @@ export default function Users() {
         )}
 
         <div className="grid grid-cols-1 gap-4">
-          {users.map((user) => (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
+              <RefreshCw className="w-10 h-10 animate-spin" />
+              <p className="font-medium">Fetching accounts...</p>
+            </div>
+          ) : users.map((user) => (
             <div key={user.username} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
               <div className="flex items-center gap-4">
                 <div className={cn(
@@ -189,7 +209,7 @@ export default function Users() {
                       type="password"
                       value={editPassword}
                       onChange={(e) => setEditPassword(e.target.value)}
-                      className="px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                      className="px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm w-full md:w-auto"
                       placeholder="New password"
                       autoFocus
                     />
