@@ -1,23 +1,31 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export interface DeviceState {
+  mac: string;
   ip: string;
   name: string;
-  power: boolean;
-  target_temperature: number;
-  current_temperature: number;
-  fan_speed: number;
-  mode: number;
-  swing_vertical: number;
-  horizontal_swing: number;
-  quiet: number;
-  turbo: boolean;
-  light: boolean;
-  sleep: boolean;
-  xfan: boolean;
-  anion: boolean;
-  power_save: boolean;
-  steady_heat: boolean;
+  online: boolean;
+  power?: boolean;
+  target_temperature?: number;
+  current_temperature?: number;
+  fan_speed?: number;
+  mode?: number;
+  swing_vertical?: number;
+  horizontal_swing?: number;
+  quiet?: number;
+  turbo?: boolean;
+  light?: boolean;
+  sleep?: boolean;
+  xfan?: boolean;
+  anion?: boolean;
+  power_save?: boolean;
+  steady_heat?: boolean;
+}
+
+export interface DiscoveredDevice {
+  mac: string;
+  ip: string;
+  name: string;
 }
 
 export interface User {
@@ -120,17 +128,35 @@ export const fetchDevices = async (): Promise<DeviceState[]> => {
   return res.json();
 };
 
-export const discoverDevices = async (): Promise<DeviceState[]> => {
+export const discoverDevices = async (): Promise<DiscoveredDevice[]> => {
   const res = await fetch(`${API_BASE}/api/discover`, { 
-    method: 'POST',
     headers: getHeaders(),
   });
   if (!res.ok) throw new Error('Failed to discover devices');
   return res.json();
 };
 
-export const updateDevice = async (ip: string, updates: Partial<DeviceState>) => {
-  const res = await fetch(`${API_BASE}/api/devices/${ip}`, {
+export const saveDevice = async (mac: string, name: string, ip?: string): Promise<DeviceState> => {
+  const res = await fetch(`${API_BASE}/api/devices`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ mac, name, ip }),
+  });
+  if (!res.ok) throw new Error('Failed to save device');
+  return res.json();
+};
+
+export const deleteDevice = async (mac: string) => {
+  const res = await fetch(`${API_BASE}/api/devices/${mac}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to delete device');
+  return res.json();
+};
+
+export const updateDevice = async (mac: string, updates: Partial<DeviceState>) => {
+  const res = await fetch(`${API_BASE}/api/devices/${mac}`, {
     method: 'PATCH',
     headers: getHeaders(),
     body: JSON.stringify(updates),

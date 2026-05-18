@@ -4,7 +4,7 @@ import os
 from typing import List, Dict, Optional
 from greeclimate.discovery import Discovery
 from greeclimate.device import Device, DeviceInfo
-from .database import SessionLocal, DBDeviceName
+from .database import SessionLocal, DBDeviceName, get_all_saved_devices
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 class GreeManager:
     def __init__(self):
         self.discovery = None
-        self.devices: Dict[str, Device] = {}
-        self.device_info: Dict[str, DeviceInfo] = {}
+        self.devices: Dict[str, Device] = {} # Keyed by MAC
+        self.device_info: Dict[str, DeviceInfo] = {} # Keyed by MAC
+        self._last_scan_results: List[DeviceInfo] = []
 
     def get_custom_name(self, mac: str) -> Optional[str]:
         db = SessionLocal()
@@ -36,9 +37,9 @@ class GreeManager:
         finally:
             db.close()
 
-    async def discover_devices(self) -> List[Dict]:
-        """Discover Gree AC units on the local network."""
-        logger.info("Searching for Gree AC units...")
+    async def discover_devices(self):
+        """Background discovery to find and bind SAVED devices."""
+        logger.info("Running network scan for saved devices...")
         try:
             if self.discovery is None:
                 self.discovery = Discovery()
@@ -49,57 +50,106 @@ class GreeManager:
                 target_ips.extend([ip.strip() for ip in env_ips.split(",")])
 
             if target_ips:
-                logger.info(f"Targeting explicit IPs: {target_ips}")
                 await self.discovery.search_devices(broadcastAddrs=target_ips)
             else:
-                logger.info("Scanning local network for devices...")
                 await self.discovery.search_devices()
 
             await asyncio.sleep(4)
-            discovered = self.discovery.devices
-            logger.info(f"Discovered items list: {discovered}")
+            self._last_scan_results = self.discovery.devices
             
-            new_devices = {}
-            for info in discovered:
-                # Use IP as the unique identifier for now
-                device_id = info.ip
-                if device_id not in self.devices:
-                    device = Device(info)
-                    # We need to bind to the device to control it
-                    try:
-                        await device.bind()
-                        self.devices[device_id] = device
-                        self.device_info[device_id] = info
-                        
-                        # Apply custom name if we have one
-                        mac = info.mac
-                        if mac:
-                            custom_name = self.get_custom_name(mac)
-                            if custom_name:
-                                self.device_info[device_id].name = custom_name
-                            
-                        logger.info(f"Discovered and bound to device at {info.ip}")
-                    except Exception as e:
-                        logger.error(f"Failed to bind to device at {info.ip}: {e}")
-                else:
-                    new_devices[device_id] = self.devices[device_id]
-            
-            return await self.get_all_states()
+            # Get saved MACs from DB
+            db = SessionLocal()
+            saved_devices = get_all_saved_devices(db)
+            saved_macs = {d.mac for d in saved_devices}
+            db.close()
+
+            for info in self._last_scan_results:
+                if info.mac in saved_macs:
+                    # It's a saved device, bind it if not already bound or if IP changed
+                    if info.mac not in self.devices or self.device_info[info.mac].ip != info.ip:
+                        device = Device(info)
+                        try:
+                            await device.bind()
+                            self.devices[info.mac] = device
+                            self.device_info[info.mac] = info
+                            logger.info(f"Bound to saved device {info.mac} at {info.ip}")
+                        except Exception as e:
+                            logger.error(f"Failed to bind to {info.mac} at {info.ip}: {e}")
         except Exception as e:
             logger.error(f"Discovery error: {e}")
-            return []
 
-    async def get_device_state(self, ip: str) -> Optional[Dict]:
-        """Get the current state of a specific device."""
-        device = self.devices.get(ip)
+    async def scan_for_new_devices(self) -> List[Dict]:
+        """Scan and return devices NOT in the saved list."""
+        await self.discover_devices() # Refresh list
+        
+        db = SessionLocal()
+        saved_devices = get_all_saved_devices(db)
+        saved_macs = {d.mac for d in saved_devices}
+        db.close()
+
+        unsaved = []
+        for info in self._last_scan_results:
+            if info.mac not in saved_macs:
+                unsaved.append({
+                    "mac": info.mac,
+                    "ip": info.ip,
+                    "name": info.name or "Gree AC"
+                })
+        return unsaved
+
+    async def add_saved_device(self, mac: str, name: str):
+        """Add a device to persistence and try to bind it."""
+        self.set_custom_name(mac, name)
+        # Check if we saw it in the last scan
+        for info in self._last_scan_results:
+            if info.mac == mac:
+                device = Device(info)
+                try:
+                    await device.bind()
+                    self.devices[mac] = device
+                    self.device_info[mac] = info
+                except Exception as e:
+                    logger.error(f"Failed to bind newly added device {mac}: {e}")
+                break
+
+    async def remove_saved_device(self, mac: str):
+        """Remove device from persistence and in-memory tracking."""
+        db = SessionLocal()
+        try:
+            device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
+            if device:
+                db.delete(device)
+                db.commit()
+        finally:
+            db.close()
+        
+        if mac in self.devices:
+            del self.devices[mac]
+        if mac in self.device_info:
+            del self.device_info[mac]
+
+    async def get_device_state(self, mac: str) -> Optional[Dict]:
+        """Get state of a saved device, handling offline status."""
+        custom_name = self.get_custom_name(mac)
+        if not custom_name:
+            return None # Not a saved device
+
+        device = self.devices.get(mac)
         if not device:
-            return None
+            return {
+                "mac": mac,
+                "name": custom_name,
+                "online": False,
+                "ip": "Unknown"
+            }
         
         try:
             await device.update_state()
             return {
-                "ip": ip,
-                "name": self.device_info[ip].name,
+                "mac": mac,
+                "ip": self.device_info[mac].ip,
+                "name": custom_name,
+                "online": True,
                 "power": device.power,
                 "target_temperature": device.target_temperature,
                 "current_temperature": device.current_temperature,
@@ -117,30 +167,35 @@ class GreeManager:
                 "steady_heat": device.steady_heat
             }
         except Exception as e:
-            logger.error(f"Failed to get state for {ip}: {e}")
-            return None
+            logger.error(f"Failed to update state for {mac}: {e}")
+            return {
+                "mac": mac,
+                "name": custom_name,
+                "online": False,
+                "ip": self.device_info[mac].ip
+            }
 
     async def get_all_states(self) -> List[Dict]:
-        """Get states for all registered devices."""
+        """Get states for all SAVED devices."""
+        db = SessionLocal()
+        saved_devices = get_all_saved_devices(db)
+        db.close()
+        
         states = []
-        for ip in list(self.devices.keys()):
-            state = await self.get_device_state(ip)
+        for d in saved_devices:
+            state = await self.get_device_state(d.mac)
             if state:
                 states.append(state)
         return states
 
-    async def update_device(self, ip: str, updates: Dict):
+    async def update_device(self, mac: str, updates: Dict):
         """Update multiple properties of a device at once."""
-        device = self.devices.get(ip)
+        device = self.devices.get(mac)
+        if "name" in updates:
+            new_name = updates.pop("name")
+            self.set_custom_name(mac, new_name)
+        
         if device:
-            if "name" in updates:
-                new_name = updates.pop("name")
-                self.device_info[ip].name = new_name
-                # Persist by MAC
-                mac = self.device_info[ip].mac
-                if mac:
-                    self.set_custom_name(mac, new_name)
-            
             for key, value in updates.items():
                 if key == "swing_vertical":
                     device.vertical_swing = value
@@ -150,20 +205,20 @@ class GreeManager:
             if updates:
                 await device.push_state_update()
 
-    async def set_power(self, ip: str, power: bool):
-        device = self.devices.get(ip)
+    async def set_power(self, mac: str, power: bool):
+        device = self.devices.get(mac)
         if device:
             device.power = power
             await device.push_state_update()
 
-    async def set_temperature(self, ip: str, temp: int):
-        device = self.devices.get(ip)
+    async def set_temperature(self, mac: str, temp: int):
+        device = self.devices.get(mac)
         if device:
             device.target_temperature = temp
             await device.push_state_update()
 
-    async def set_fan_speed(self, ip: str, speed: int):
-        device = self.devices.get(ip)
+    async def set_fan_speed(self, mac: str, speed: int):
+        device = self.devices.get(mac)
         if device:
             device.fan_speed = speed
             await device.push_state_update()

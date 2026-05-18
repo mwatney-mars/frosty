@@ -29,6 +29,27 @@ class DBDeviceName(Base):
     mac = Column(String, primary_key=True, index=True)
     name = Column(String)
 
+def get_all_saved_devices(db):
+    return db.query(DBDeviceName).all()
+
+def add_saved_device(db, mac, name):
+    device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
+    if device:
+        device.name = name
+    else:
+        device = DBDeviceName(mac=mac, name=name)
+        db.add(device)
+    db.commit()
+    return device
+
+def delete_saved_device(db, mac):
+    device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
+    if device:
+        db.delete(device)
+        db.commit()
+        return True
+    return False
+
 def init_db():
     # Ensure the directory exists if a custom path is provided
     db_dir = os.path.dirname(DB_PATH)

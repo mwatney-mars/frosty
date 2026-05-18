@@ -15,9 +15,21 @@ import {
   Edit2,
   Check,
   LogOut,
-  Users as UsersIcon
+  AlertCircle,
+  Settings
 } from 'lucide-react';
-import { fetchDevices, discoverDevices, updateDevice, logout, fetchMe, updateUserInfo, type DeviceState, type User } from './api';
+import { 
+  fetchDevices, 
+  discoverDevices, 
+  updateDevice, 
+  logout, 
+  fetchMe, 
+  updateUserInfo, 
+  saveDevice,
+  type DeviceState, 
+  type User, 
+  type DiscoveredDevice 
+} from './api';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router-dom';
@@ -60,25 +72,27 @@ export default function App() {
   const [devices, setDevices] = useState<DeviceState[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedIp, setSelectedIp] = useState<string | null>(null);
+  const [selectedMac, setSelectedMac] = useState<string | null>(null);
+  const [discovered, setDiscovered] = useState<DiscoveredDevice[]>([]);
   
   const { isDark, toggleTheme } = useTheme();
 
-  const [editingIp, setEditingIp] = useState<string | null>(null);
+  const [editingMac, setEditingMac] = useState<string | null>(null);
   const [editName, setEditName] = useState<string>('');
   const nameInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (devices.length > 0 && !selectedIp) {
-      setSelectedIp(devices[0].ip);
-    } else if (devices.length > 0 && selectedIp) {
-      if (!devices.find(d => d.ip === selectedIp)) {
-        setSelectedIp(devices[0].ip);
+    if (devices.length > 0 && !selectedMac) {
+      setSelectedMac(devices[0].mac);
+    } else if (devices.length > 0 && selectedMac) {
+      if (!devices.find(d => d.mac === selectedMac)) {
+        setSelectedMac(devices[0].mac);
       }
     }
-  }, [devices, selectedIp]);
+  }, [devices, selectedMac]);
 
   const loadInitialData = async () => {
     try {
@@ -103,19 +117,30 @@ export default function App() {
       const data = await fetchDevices();
       setDevices(data);
     } catch (err: any) {
-      // Background reload failures are handled silently or via error state
+      // Background reload failures are handled silently
     }
   };
 
-  const handleDiscover = async () => {
-    setLoading(true);
+  const handleInitialDiscover = async () => {
+    setScanning(true);
+    setError(null);
     try {
-      await discoverDevices();
+      const data = await discoverDevices();
+      setDiscovered(data);
+    } catch (err) {
+      setError('Discovery failed. Please try again.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleAddInitial = async (device: DiscoveredDevice) => {
+    try {
+      await saveDevice(device.mac, device.name, device.ip);
+      setDiscovered(prev => prev.filter(d => d.mac !== device.mac));
       await loadDevices();
     } catch (err) {
-      setError('Discovery failed');
-    } finally {
-      setLoading(false);
+      alert('Failed to add device');
     }
   };
 
@@ -148,10 +173,10 @@ export default function App() {
     };
   }, []);
 
-  const updateSetting = async (ip: string, updates: Partial<DeviceState>) => {
+  const updateSetting = async (mac: string, updates: Partial<DeviceState>) => {
     try {
-      setDevices(current => current.map(d => d.ip === ip ? { ...d, ...updates } : d));
-      await updateDevice(ip, updates);
+      setDevices(current => current.map(d => d.mac === mac ? { ...d, ...updates } : d));
+      await updateDevice(mac, updates);
       await loadDevices();
     } catch (err) {
       setError('Failed to update device settings');
@@ -159,8 +184,8 @@ export default function App() {
     }
   };
 
-  const startEditingName = (ip: string, currentName: string) => {
-    setEditingIp(ip);
+  const startEditingName = (mac: string, currentName: string) => {
+    setEditingMac(mac);
     setEditName(currentName || 'Gree AC');
     setTimeout(() => nameInputRef.current?.focus(), 10);
   };
@@ -169,10 +194,10 @@ export default function App() {
     if (editName.trim()) {
       await updateSetting(mac, { name: editName.trim() });
     }
-    setEditingIp(null);
+    setEditingMac(null);
   };
 
-  const activeDevice = devices.find(d => d.ip === selectedIp);
+  const activeDevice = devices.find(d => d.mac === selectedMac);
 
   if (user?.requires_password_change) {
     return (
@@ -247,11 +272,11 @@ export default function App() {
           
           {user?.is_admin && (
             <button 
-              onClick={() => navigate('/users')}
+              onClick={() => navigate('/settings')}
               className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 transition-colors shadow-sm"
-              aria-label="User Management"
+              aria-label="Settings"
             >
-              <UsersIcon className="w-5 h-5" />
+              <Settings className="w-5 h-5" />
             </button>
           )}
 
@@ -261,14 +286,6 @@ export default function App() {
             aria-label="Logout"
           >
             <LogOut className="w-5 h-5" />
-          </button>
-          <button 
-            onClick={handleDiscover}
-            disabled={loading}
-            className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white px-3 md:px-4 py-2 rounded-lg shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-            <span className="hidden sm:inline font-medium">Discover</span>
           </button>
         </div>
       </header>
@@ -282,18 +299,47 @@ export default function App() {
         )}
 
         {devices.length === 0 && !loading ? (
-          <div className="text-center py-24 bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700 rounded-3xl my-auto">
-            <div className="bg-slate-50 dark:bg-slate-900 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Settings2 className="w-10 h-10 text-slate-400 dark:text-slate-500" />
+          <div className="flex-1 flex flex-col items-center justify-center py-12">
+            <div className="text-center max-w-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-8 md:p-12 rounded-3xl shadow-xl">
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8">
+                <RefreshCw className={cn("w-12 h-12 text-indigo-600", scanning && "animate-spin")} />
+              </div>
+              <h2 className="text-3xl font-bold mb-4 text-slate-900 dark:text-white">Welcome to Frosty</h2>
+              <p className="text-slate-500 dark:text-slate-400 mb-10 leading-relaxed text-lg">
+                To get started, we need to find your Gree AC units on the network. 
+                Please ensure they are powered on and connected to your Wi-Fi.
+              </p>
+              
+              {discovered.length > 0 ? (
+                <div className="space-y-4 text-left mb-8">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Found {discovered.length} Devices</h3>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-700 border border-slate-100 dark:border-slate-700 rounded-xl overflow-hidden">
+                    {discovered.map(d => (
+                      <div key={d.mac} className="p-4 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+                        <div>
+                          <p className="font-bold text-slate-900 dark:text-white">{d.name}</p>
+                          <p className="text-xs text-slate-500 font-mono">{d.ip} • {d.mac}</p>
+                        </div>
+                        <button 
+                          onClick={() => handleAddInitial(d)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <button 
+                onClick={handleInitialDiscover}
+                disabled={scanning}
+                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none active:scale-[0.98] disabled:opacity-50"
+              >
+                {scanning ? 'Searching...' : 'Scan for Devices'}
+              </button>
             </div>
-            <h2 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">No devices found</h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto">Make sure your AC units are powered on and connected to the same Wi-Fi network as the server.</p>
-            <button 
-              onClick={handleDiscover}
-              className="bg-indigo-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
-            >
-              Start Discovery
-            </button>
           </div>
         ) : (
           <>
@@ -303,13 +349,14 @@ export default function App() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-3">
                   {devices.map(device => (
                     <button
-                      key={device.ip}
-                      onClick={() => setSelectedIp(device.ip)}
+                      key={device.mac}
+                      onClick={() => setSelectedMac(device.mac)}
                       className={cn(
                         "flex items-center p-3 md:p-4 rounded-2xl border text-left transition-all duration-200 w-full relative overflow-hidden group",
-                        selectedIp === device.ip
+                        selectedMac === device.mac
                           ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-sm ring-1 ring-indigo-500"
-                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 opacity-90 hover:opacity-100 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 opacity-90 hover:opacity-100 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm",
+                        !device.online && "grayscale opacity-60"
                       )}
                     >
                       <div className="flex items-center justify-between w-full gap-3">
@@ -318,11 +365,12 @@ export default function App() {
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={cn(
                             "flex items-center justify-center w-10 h-10 rounded-full shrink-0 transition-colors",
-                            device.power 
-                              ? (selectedIp === device.ip ? "bg-indigo-500 text-white shadow-md shadow-indigo-200 dark:shadow-none" : "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400")
+                            device.online && device.power 
+                              ? (selectedMac === device.mac ? "bg-indigo-500 text-white shadow-md shadow-indigo-200 dark:shadow-none" : "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400")
                               : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
                           )}>
-                            {device.power ? (
+                            {!device.online ? <AlertCircle className="w-5 h-5" /> : 
+                             device.power ? (
                                device.mode === 1 ? <Snowflake className="w-5 h-5" /> :
                                device.mode === 2 ? <Droplets className="w-5 h-5" /> :
                                device.mode === 3 ? <Fan className="w-5 h-5" /> :
@@ -334,15 +382,16 @@ export default function App() {
                           <div className="flex flex-col min-w-0">
                             <span className={cn(
                               "font-bold text-sm md:text-base truncate block leading-tight",
-                              selectedIp === device.ip ? "text-indigo-900 dark:text-indigo-100" : "text-slate-800 dark:text-slate-100"
+                              selectedMac === device.mac ? "text-indigo-900 dark:text-indigo-100" : "text-slate-800 dark:text-slate-100"
                             )}>
                               {device.name || 'Gree AC'}
                             </span>
                             <span className={cn(
                               "text-[11px] md:text-xs truncate block mt-0.5",
+                              !device.online ? "text-red-500 font-bold" :
                               device.power ? "text-indigo-600 dark:text-indigo-400 font-medium" : "text-slate-400 dark:text-slate-500"
                             )}>
-                              {device.power ? `To ${device.target_temperature}°` : 'Standby'}
+                              {!device.online ? 'OFFLINE' : device.power ? `To ${device.target_temperature}°` : 'Standby'}
                             </span>
                           </div>
                         </div>
@@ -350,7 +399,7 @@ export default function App() {
                         {/* Right: Current Temp */}
                         <div className="flex items-center shrink-0 pl-2 border-l border-slate-100 dark:border-slate-700/50">
                            <div className="text-sm md:text-base font-bold text-slate-600 dark:text-slate-300 w-8 text-right">
-                             {device.current_temperature}°
+                             {device.online ? `${device.current_temperature}°` : '--°'}
                            </div>
                         </div>
                         
@@ -363,24 +412,37 @@ export default function App() {
 
             {/* Active Device Settings Pane */}
             {activeDevice && (
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-sm overflow-hidden transition-colors flex-1 flex flex-col">
+              <div className={cn(
+                "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-sm overflow-hidden transition-all flex-1 flex flex-col relative",
+                !activeDevice.online && "pointer-events-none"
+              )}>
+                {!activeDevice.online && (
+                  <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-[2px] z-40 flex items-center justify-center">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 text-center max-w-xs">
+                       <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                       <h3 className="text-xl font-bold mb-2">Device Offline</h3>
+                       <p className="text-slate-500 dark:text-slate-400 text-sm">Frosty cannot reach this AC unit. Please check its power and Wi-Fi connection.</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="p-5 md:p-8 flex-1">
                   
                   {/* Pane Header */}
                   <div className="flex items-start justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-700/50">
                     <div className="overflow-hidden">
-                      {editingIp === activeDevice.ip ? (
+                      {editingMac === activeDevice.mac ? (
                         <div className="flex items-center gap-2 mb-1">
                           <input
                             ref={nameInputRef}
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && saveName(activeDevice.ip)}
-                            onBlur={() => saveName(activeDevice.ip)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveName(activeDevice.mac)}
+                            onBlur={() => saveName(activeDevice.mac)}
                             className="text-2xl md:text-3xl font-bold bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
                           />
-                          <button onClick={() => saveName(activeDevice.ip)} className="p-2 text-green-600 dark:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors">
+                          <button onClick={() => saveName(activeDevice.mac)} className="p-2 text-green-600 dark:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors">
                             <Check className="w-6 h-6" />
                           </button>
                         </div>
@@ -388,13 +450,13 @@ export default function App() {
                         <div className="flex items-center gap-3 mb-1 group">
                           <h3 
                             className={cn("text-2xl md:text-3xl font-bold text-slate-900 dark:text-white truncate", user?.is_admin && "cursor-pointer")} 
-                            onClick={() => user?.is_admin && startEditingName(activeDevice.ip, activeDevice.name)}
+                            onClick={() => user?.is_admin && startEditingName(activeDevice.mac, activeDevice.name)}
                           >
                             {activeDevice.name || 'Gree AC'}
                           </h3>
                           {user?.is_admin && (
                             <button 
-                              onClick={() => startEditingName(activeDevice.ip, activeDevice.name)}
+                              onClick={() => startEditingName(activeDevice.mac, activeDevice.name)}
                               className="p-1.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity hover:text-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md"
                               aria-label="Edit Name"
                             >
@@ -406,15 +468,16 @@ export default function App() {
                       <p className="text-slate-400 dark:text-slate-500 text-sm flex items-center gap-2">
                         <span className="font-mono">{activeDevice.ip}</span>
                         <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
-                        <span>Status: {activeDevice.power ? 'Running' : 'Standby'}</span>
+                        <span>Status: {activeDevice.online ? (activeDevice.power ? 'Running' : 'Standby') : 'Offline'}</span>
                       </p>
                     </div>
                     
                     <button 
-                      onClick={() => updateSetting(activeDevice.ip, { power: !activeDevice.power })}
+                      onClick={() => updateSetting(activeDevice.mac, { power: !activeDevice.power })}
+                      disabled={!activeDevice.online}
                       className={cn(
                         "p-4 md:p-5 rounded-2xl transition-all duration-300 shrink-0 border ml-4",
-                        activeDevice.power 
+                        activeDevice.online && activeDevice.power 
                           ? "bg-green-500 border-green-500 text-white shadow-[0_8px_16px_-6px_rgba(34,197,94,0.5)]" 
                           : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800"
                       )}
@@ -433,7 +496,10 @@ export default function App() {
                             <Thermometer className="w-4 h-4" />
                             <span className="font-semibold uppercase tracking-wider text-xs">Indoor</span>
                           </div>
-                          <div className="text-4xl font-bold text-slate-900 dark:text-white">{activeDevice.current_temperature}<span className="text-2xl text-slate-400">°C</span></div>
+                          <div className="text-4xl font-bold text-slate-900 dark:text-white">
+                            {activeDevice.online ? activeDevice.current_temperature : '--'}
+                            <span className="text-2xl text-slate-400">°C</span>
+                          </div>
                         </div>
                         <div className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-800/30">
                           <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 text-sm mb-3">
@@ -441,16 +507,19 @@ export default function App() {
                             <span className="font-semibold uppercase tracking-wider text-xs">Target</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-4xl font-bold text-indigo-900 dark:text-indigo-100">{activeDevice.target_temperature}<span className="text-2xl text-indigo-400 dark:text-indigo-500">°C</span></span>
+                            <span className="text-4xl font-bold text-indigo-900 dark:text-indigo-100">
+                              {activeDevice.online ? activeDevice.target_temperature : '--'}
+                              <span className="text-2xl text-indigo-400 dark:text-indigo-500">°C</span>
+                            </span>
                             <div className="flex flex-col gap-1.5 ml-2">
                               <button 
-                                onClick={() => updateSetting(activeDevice.ip, { target_temperature: activeDevice.target_temperature + 1 })}
+                                onClick={() => activeDevice.target_temperature !== undefined && updateSetting(activeDevice.mac, { target_temperature: activeDevice.target_temperature + 1 })}
                                 className="p-2 hover:bg-indigo-200 dark:hover:bg-indigo-800 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl text-indigo-700 dark:text-indigo-300 transition-colors active:scale-95"
                               >
                                 <Plus className="w-5 h-5" />
                               </button>
                               <button 
-                                onClick={() => updateSetting(activeDevice.ip, { target_temperature: activeDevice.target_temperature - 1 })}
+                                onClick={() => activeDevice.target_temperature !== undefined && updateSetting(activeDevice.mac, { target_temperature: activeDevice.target_temperature - 1 })}
                                 className="p-2 hover:bg-indigo-200 dark:hover:bg-indigo-800 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl text-indigo-700 dark:text-indigo-300 transition-colors active:scale-95"
                               >
                                 <Minus className="w-5 h-5" />
@@ -469,7 +538,7 @@ export default function App() {
                             return (
                               <button
                                 key={mode.value}
-                                onClick={() => updateSetting(activeDevice.ip, { mode: mode.value })}
+                                onClick={() => updateSetting(activeDevice.mac, { mode: mode.value })}
                                 className={cn(
                                   "flex flex-col items-center justify-center gap-2 py-3 px-1 text-xs font-semibold rounded-xl border transition-all",
                                   isSelected
@@ -491,7 +560,7 @@ export default function App() {
                           {FAN_SPEEDS.map((speed) => (
                             <button
                               key={speed.value}
-                              onClick={() => updateSetting(activeDevice.ip, { fan_speed: speed.value })}
+                              onClick={() => updateSetting(activeDevice.mac, { fan_speed: speed.value })}
                               className={cn(
                                 "px-4 py-2.5 text-sm font-medium rounded-xl border transition-all flex-1 text-center whitespace-nowrap",
                                 activeDevice.fan_speed === speed.value
@@ -515,8 +584,8 @@ export default function App() {
                             <label className="block text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mb-2">Vertical Swing</label>
                             <select 
                               className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none shadow-sm"
-                              value={activeDevice.swing_vertical}
-                              onChange={(e) => updateSetting(activeDevice.ip, { swing_vertical: Number(e.target.value) })}
+                              value={activeDevice.swing_vertical || 0}
+                              onChange={(e) => updateSetting(activeDevice.mac, { swing_vertical: Number(e.target.value) })}
                             >
                               <option value={0}>Default / Sweep</option>
                               <option value={1}>Fixed (Highest)</option>
@@ -530,8 +599,8 @@ export default function App() {
                             <label className="block text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mb-2">Horizontal Swing</label>
                             <select 
                               className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none shadow-sm"
-                              value={activeDevice.horizontal_swing}
-                              onChange={(e) => updateSetting(activeDevice.ip, { horizontal_swing: Number(e.target.value) })}
+                              value={activeDevice.horizontal_swing || 0}
+                              onChange={(e) => updateSetting(activeDevice.mac, { horizontal_swing: Number(e.target.value) })}
                             >
                               <option value={0}>Default / Sweep</option>
                               <option value={1}>Fixed (Far Left)</option>
@@ -555,7 +624,7 @@ export default function App() {
                             return (
                               <button
                                 key={toggle.key}
-                                onClick={() => updateSetting(activeDevice.ip, { [toggle.key]: nextValue })}
+                                onClick={() => updateSetting(activeDevice.mac, { [toggle.key]: nextValue })}
                                 className={cn(
                                   "flex flex-col items-start justify-between p-4 rounded-2xl border transition-all text-left min-h-[80px]",
                                   isActive
