@@ -28,7 +28,7 @@ version: '3.8'
 
 services:
   frosty:
-    build: . # If building locally
+    image: gutolm/frosty:latest
     container_name: frosty
     network_mode: "host"
     restart: unless-stopped
@@ -42,7 +42,7 @@ services:
 
 Run it:
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 Access the UI at: **http://YOUR_SERVER_IP:8000**
