@@ -33,10 +33,13 @@ services:
     network_mode: "host"
     restart: unless-stopped
     volumes:
-      - ./frosty-data:/app/data
+      - frosty_data:/app/data
     environment:
       # Optional: Explicitly define IPs if UDP broadcast isn't working
       # - GREE_IPS=192.168.1.100,192.168.1.101
+
+volumes:
+  frosty_data:
 ```
 
 Run it:
