@@ -34,7 +34,7 @@ services:
     restart: unless-stopped
     volumes:
       - frosty_data:/app/data
-    environment:
+    # environment:
       # Optional: Explicitly define IPs if UDP broadcast isn't working
       # - GREE_IPS=192.168.1.100,192.168.1.101
 
