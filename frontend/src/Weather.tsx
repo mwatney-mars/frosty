@@ -6,20 +6,15 @@ export default function WeatherWidget() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchWeather() {
+    async function fetchWeather(lat: number, lon: number) {
       try {
-        const geoRes = await fetch('https://ipapi.co/json/');
-        const geoData = await geoRes.json();
-        const lat = geoData.latitude || 51.5074;
-        const lon = geoData.longitude || -0.1278;
-
         const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,is_day&timezone=auto`);
         const weatherData = await weatherRes.json();
         
         setWeather({
           temp: weatherData.current.temperature_2m,
           isDay: weatherData.current.is_day,
-          city: geoData.city || 'Local'
+          city: 'Current Location'
         });
       } catch (err) {
         console.error("Failed to fetch weather", err);
@@ -27,7 +22,21 @@ export default function WeatherWidget() {
         setLoading(false);
       }
     }
-    fetchWeather();
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          fetchWeather(position.coords.latitude, position.coords.longitude);
+        },
+        (error) => {
+          console.warn("Geolocation failed or denied, using London default:", error);
+          fetchWeather(51.5074, -0.1278); // Fallback to London
+        },
+        { timeout: 10000 }
+      );
+    } else {
+      fetchWeather(51.5074, -0.1278); // Fallback to London
+    }
   }, []);
 
   if (loading) {

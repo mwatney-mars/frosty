@@ -18,13 +18,16 @@ const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
 export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [devices, setDevices] = useState<DeviceState[]>([]);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
 
   const refreshDevices = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
       const data = await fetchDevices();
       setDevices(data);
@@ -34,6 +37,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshAll = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        setLoading(false);
+        return;
+    }
+
     try {
       if (devices.length === 0) setLoading(true);
       const [devicesData, userData] = await Promise.all([
@@ -53,6 +62,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   }, [devices.length]);
 
   const connectWebSocket = useCallback(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     // If already connecting or open, don't start another
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
@@ -61,12 +73,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/ws`;
     
-    console.log('[WS] Connecting to:', wsUrl);
+    console.log('[WS] Connecting...');
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       console.log('[WS] Connected');
-      refreshDevices(); // Fetch latest state once connected
+      refreshDevices();
     };
 
     ws.onmessage = (event) => {
@@ -79,34 +91,66 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     };
 
     ws.onclose = (event) => {
-      console.log(`[WS] Disconnected (code: ${event.code}), retrying in 3s...`);
       wsRef.current = null;
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
+      const tokenExists = !!localStorage.getItem('token');
+      if (tokenExists) {
+        console.log(`[WS] Disconnected (code: ${event.code}), retrying in 3s...`);
+        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
+      } else {
+        console.log('[WS] Disconnected (logged out)');
+      }
     };
 
     ws.onerror = (err) => {
       console.error('[WS] Error:', err);
-      // Let onclose handle reconnection
     };
 
     wsRef.current = ws;
   }, [refreshDevices]);
 
+  // Handle Initial Load and Token Changes
   useEffect(() => {
-    refreshAll();
-  }, []); // Only run once on mount
+    const token = localStorage.getItem('token');
+    if (token) {
+      refreshAll();
+      connectWebSocket();
+    }
 
-  useEffect(() => {
-    connectWebSocket();
+    // Listener for login/logout across tabs or state updates
+    const handleStorageChange = () => {
+      const newToken = localStorage.getItem('token');
+      if (newToken) {
+        refreshAll();
+        connectWebSocket();
+      } else {
+        setUser(null);
+        setDevices([]);
+        wsRef.current?.close();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Check periodically for token (fallback for same-tab updates that don't trigger 'storage')
+    const interval = setInterval(() => {
+        const currentToken = localStorage.getItem('token');
+        if (currentToken && !user && !loading) {
+            refreshAll();
+            connectWebSocket();
+        }
+    }, 2000);
+
     return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (wsRef.current) {
-        wsRef.current.onclose = null; // Prevent reconnection loop during unmount
+        wsRef.current.onclose = null;
         wsRef.current.close();
       }
     };
-  }, [connectWebSocket]);
+  }, [refreshAll, connectWebSocket, user, loading]);
 
   return (
     <DeviceContext.Provider value={{ 
