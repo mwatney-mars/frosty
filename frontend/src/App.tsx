@@ -139,11 +139,19 @@ export default function App() {
   };
 
   const updateSetting = async (mac: string, updates: Partial<DeviceState>) => {
+    // Optimistic UI Update
+    setDevices(prev => prev.map(d => 
+      d.mac === mac ? { ...d, ...updates } : d
+    ));
+
     try {
       await updateDevice(mac, updates);
-      refreshDevices();
+      // Wait slightly for the AC unit to process the UDP packet before fetching the real state
+      setTimeout(() => refreshDevices(true), 1000);
     } catch (err) {
       setError('Failed to update device settings');
+      // Revert will happen naturally on the next poll/refresh
+      refreshDevices(true);
     }
   };
 

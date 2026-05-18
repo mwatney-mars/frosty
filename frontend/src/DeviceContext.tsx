@@ -155,6 +155,26 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     };
   }, [token]);
 
+  
+  // HTTP Polling Fallback
+  useEffect(() => {
+    let pollInterval: any;
+    
+    // We check connection state dynamically inside the interval to avoid dependency loops
+    if (token && !showOnboarding) {
+        pollInterval = setInterval(() => {
+            const isWsConnected = wsRef.current && wsRef.current.readyState === WebSocket.OPEN;
+            if (!isWsConnected) {
+                refreshDevices(true);
+            }
+        }, 4000);
+    }
+
+    return () => {
+        if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [token, showOnboarding, refreshDevices]);
+
   // Main lifecycle
   useEffect(() => {
     if (token) {
