@@ -33,3 +33,6 @@ env/
 
 # Logs
 *.log
+
+# Internal Knowledge
+GEMINI.md
