@@ -69,6 +69,7 @@ const TOGGLES = [
 export default function App() {
   const { 
     devices, 
+    setDevices,
     user, 
     setUser, 
     initialized, 
