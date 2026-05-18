@@ -125,14 +125,19 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {}
     };
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       wsRef.current = null;
+      console.log(`[WS] Disconnected (code: ${event.code})`);
       if (localStorage.getItem('token')) {
+        console.log('[WS] Retrying connection in 5 seconds...');
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
       }
     };
-    ws.onerror = () => ws.close();
+    ws.onerror = (err) => {
+        console.error('[WS] Connection error:', err);
+        ws.close();
+    };
     wsRef.current = ws;
   }, []);
 

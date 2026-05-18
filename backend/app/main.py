@@ -81,6 +81,10 @@ async def websocket_endpoint(websocket: WebSocket):
     # The frontend will ensure it only connects when a token exists
     if await manager.connect(websocket):
         try:
+            # Allow tunnel handshakes (e.g. Cloudflare) to fully resolve 
+            # before we blast the first data frame.
+            await asyncio.sleep(0.2)
+            
             # Send initial state
             states = await gree_manager.get_all_states()
             await websocket.send_text(json.dumps(states))
@@ -88,7 +92,8 @@ async def websocket_endpoint(websocket: WebSocket):
             while True:
                 # Keep connection alive
                 await websocket.receive_text()
-        except (WebSocketDisconnect, Exception):
+        except (WebSocketDisconnect, Exception) as e:
+            print(f"WS Exception: {repr(e)}")
             manager.disconnect(websocket)
 
 app.add_middleware(
