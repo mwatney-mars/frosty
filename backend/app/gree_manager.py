@@ -191,9 +191,19 @@ class GreeManager:
         
         return [s for s in states if s is not None]
 
-    async def update_device(self, mac: str, updates: Dict):
+    async def update_device(self, identifier: str, updates: Dict):
         """Update multiple properties of a device at once."""
+        mac = identifier
         device = self.devices.get(mac)
+        
+        # Fallback for old cached mobile clients that still use IP in the URL path
+        if not device:
+            for m, info in self.device_info.items():
+                if info.ip == identifier:
+                    mac = m
+                    device = self.devices.get(mac)
+                    break
+
         if "name" in updates:
             new_name = updates.pop("name")
             db = SessionLocal()
