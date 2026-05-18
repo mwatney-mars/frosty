@@ -341,7 +341,7 @@ export default function App() {
             {/* Horizontal Device Selector */}
             {devices.length > 0 && (
               <div className="mb-6 shrink-0">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   {devices.map(device => (
                     <button
                       key={device.mac}
