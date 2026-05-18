@@ -50,6 +50,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
 class User(BaseModel):
     username: str
     is_admin: bool = False
+    requires_password_change: bool = False
 
 def verify_password(plain_password, hashed_password):
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
@@ -124,4 +125,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(DBUser).filter(DBUser.username == username).first()
     if user is None:
         raise credentials_exception
-    return User(username=user.username, is_admin=user.is_admin)
+        
+    needs_change = False
+    if user.username == "admin" and verify_password("admin", user.hashed_password):
+        needs_change = True
+        
+    return User(username=user.username, is_admin=user.is_admin, requires_password_change=needs_change)

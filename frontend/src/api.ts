@@ -23,6 +23,7 @@ export interface DeviceState {
 export interface User {
   username: string;
   is_admin: boolean;
+  requires_password_change?: boolean;
 }
 
 const getHeaders = () => {

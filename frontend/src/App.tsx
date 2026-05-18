@@ -17,7 +17,7 @@ import {
   LogOut,
   Users as UsersIcon
 } from 'lucide-react';
-import { fetchDevices, discoverDevices, updateDevice, logout, fetchMe, type DeviceState, type User } from './api';
+import { fetchDevices, discoverDevices, updateDevice, logout, fetchMe, updateUserInfo, type DeviceState, type User } from './api';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router-dom';
@@ -173,6 +173,55 @@ export default function App() {
   };
 
   const activeDevice = devices.find(d => d.ip === selectedIp);
+
+  if (user?.requires_password_change) {
+    return (
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-center w-12 h-12 bg-amber-100 text-amber-600 rounded-full mb-6 mx-auto">
+            <LogOut className="w-6 h-6" />
+          </div>
+          <h2 className="text-2xl font-bold text-center text-slate-900 dark:text-white mb-2">Change Default Password</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-center mb-6 text-sm">
+            For security reasons, you must change the default administrator password before continuing.
+          </p>
+          
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            const pwd = fd.get('password') as string;
+            if (pwd.length < 5) {
+              alert('Password must be at least 5 characters');
+              return;
+            }
+            try {
+              await updateUserInfo(user.username, { password: pwd });
+              setUser({ ...user, requires_password_change: false });
+            } catch(err) {
+              alert('Failed to update password');
+            }
+          }} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">New Password</label>
+              <input 
+                name="password" 
+                type="password" 
+                required 
+                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                placeholder="Enter a secure password..."
+              />
+            </div>
+            <button 
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-colors shadow-md shadow-indigo-200 dark:shadow-none"
+            >
+              Update Password & Continue
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans p-4 md:p-6 transition-colors duration-200 flex flex-col">
