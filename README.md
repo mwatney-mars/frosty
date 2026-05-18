@@ -6,7 +6,7 @@ Frosty gives you a beautiful dashboard to control all your Gree AC units from an
 
 ## Features
 - 🚀 **Real-time Sync**: Instant updates across all your devices using WebSockets.
-- 📱 **Mobile-First PWA**: Install it on your iOS or Android home screen like a native app.
+- 📱 **Mobile-First PWA**: Install it on your iOS or Android home screen like a native app. *(Note: Android requires the app to be served over a secure **HTTPS** connection, such as via a Cloudflare Tunnel, for installation to succeed).*
 - 🎨 **Modern Dashboard**: Clean, responsive grid UI with dynamic mode icons.
 - 🔒 **Secure Multi-User**: Built-in authentication with Admin and User roles.
 - 💾 **Persistent Naming**: Give your units custom names (e.g., "Living Room") that survive DHCP IP changes.
