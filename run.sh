@@ -15,4 +15,4 @@ fi
 
 # Start the backend
 echo "Launching FastAPI backend on port 8000..."
-./backend/venv/bin/python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+./backend/venv/bin/python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips="*"
