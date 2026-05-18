@@ -121,7 +121,6 @@ export const fetchDevices = async (): Promise<DeviceState[]> => {
   });
   if (res.status === 401) {
     logout();
-    window.location.href = '/login';
     throw new Error('Unauthorized');
   }
   if (!res.ok) throw new Error('Failed to fetch devices');
