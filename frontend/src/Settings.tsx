@@ -137,6 +137,11 @@ export default function Settings() {
               </div>
               <ChevronRight className="w-6 h-6 text-slate-300 group-hover:text-indigo-500 transition-colors" />
             </button>
+
+            <div className="mt-8 text-center text-slate-500 dark:text-slate-400">
+              <p className="font-medium text-sm">Frosty Smart AC Controller</p>
+              <p className="font-mono text-xs mt-1">Version 1.0.1</p>
+            </div>
           </div>
         ) : (
           <>
