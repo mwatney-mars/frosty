@@ -73,3 +73,17 @@ If you prefer to run it directly on bare metal (e.g., a Raspberry Pi):
 
 ## ☁️ Remote Access
 Frosty is designed to be hosted locally. If you want to access it from outside your home securely without opening ports, we recommend using Cloudflare Tunnels. See [CLOUD.md](CLOUD.md) for a step-by-step guide.
+
+---
+
+## 📜 Credits & Third-Party Attribution
+
+Frosty is built on top of excellent open-source libraries and APIs:
+
+*   **Gree Device Communication:** Powered by the fantastic [greeclimate](https://github.com/cmroche/greeclimate) library by **cmroche**, which handles the heavy lifting of cryptographic handshakes and Gree local UDP protocols.
+*   **Web Framework:** [FastAPI](https://fastapi.tiangolo.com/) by **Sebastián Ramírez** and [Uvicorn](https://www.uvicorn.org/) for the high-performance asynchronous API & WebSocket engine.
+*   **Frontend Core:** Built with [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), and compiled using [Vite](https://vite.dev/).
+*   **Aesthetics & UI:** Styled using [Tailwind CSS](https://tailwindcss.com/) with beautifully crafted icons from [Lucide React](https://lucide.dev/).
+*   **Weather Integration:** Real-time weather widget data is powered by the free and open-source [Open-Meteo API](https://open-meteo.com/).
+
+Thank you to all the open-source maintainers who made this project possible!
