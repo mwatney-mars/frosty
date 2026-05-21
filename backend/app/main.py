@@ -76,9 +76,21 @@ async def background_discovery():
         await asyncio.sleep(60) # Scan every 60 seconds
 
 @app.websocket("/api/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    # Passively check for token - we don't block here to allow WS to connect
-    # The frontend will ensure it only connects when a token exists
+async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None, db: Session = Depends(get_db)):
+    if not token:
+        # Reject handshake if token is missing
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Token missing")
+        return
+        
+    try:
+        from .auth import get_current_user
+        # Decodes token and raises HTTP 401 if invalid or expired
+        get_current_user(token=token, db=db)
+    except Exception:
+        # Reject handshake if token is invalid or expired
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+        return
+
     if await manager.connect(websocket):
         try:
             # Allow tunnel handshakes (e.g. Cloudflare) to fully resolve 
@@ -155,6 +167,15 @@ class DiscoveredDevice(BaseModel):
     mac: str
     ip: str
     name: str
+
+class PowerRequest(BaseModel):
+    power: bool
+
+class TemperatureRequest(BaseModel):
+    temperature: int
+
+class FanSpeedRequest(BaseModel):
+    fan_speed: int
 
 @app.on_event("startup")
 async def startup_event():
@@ -266,6 +287,27 @@ async def update_device(mac: str, updates: DeviceUpdate, current_user: User = De
     states = await gree_manager.get_all_states()
     await manager.broadcast(json.dumps(states))
     
+    return await gree_manager.get_device_state(mac)
+
+@app.post("/api/devices/{mac}/power")
+async def set_power(mac: str, request: PowerRequest, current_user: User = Depends(get_current_user)):
+    await gree_manager.update_device(mac, {"power": request.power})
+    states = await gree_manager.get_all_states()
+    await manager.broadcast(json.dumps(states))
+    return await gree_manager.get_device_state(mac)
+
+@app.post("/api/devices/{mac}/temperature")
+async def set_temperature(mac: str, request: TemperatureRequest, current_user: User = Depends(get_current_user)):
+    await gree_manager.update_device(mac, {"target_temperature": request.temperature})
+    states = await gree_manager.get_all_states()
+    await manager.broadcast(json.dumps(states))
+    return await gree_manager.get_device_state(mac)
+
+@app.post("/api/devices/{mac}/fan_speed")
+async def set_fan_speed(mac: str, request: FanSpeedRequest, current_user: User = Depends(get_current_user)):
+    await gree_manager.update_device(mac, {"fan_speed": request.fan_speed})
+    states = await gree_manager.get_all_states()
+    await manager.broadcast(json.dumps(states))
     return await gree_manager.get_device_state(mac)
 
 # Frontend static files serving

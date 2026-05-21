@@ -77,7 +77,8 @@ export default function App() {
     finishOnboarding,
     error, 
     setError, 
-    refreshDevices 
+    refreshDevices,
+    wsStatus
   } = useDevices();
   
   const [scanning, setScanning] = useState(false);
@@ -228,8 +229,37 @@ export default function App() {
             <Wind className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">Frosty</h1>
-            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium">Smart AC Controller</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">Frosty</h1>
+              {initialized && !showOnboarding && (
+                <div 
+                  className={cn(
+                    "w-2.5 h-2.5 rounded-full transition-all duration-300",
+                    wsStatus === 'connected' ? "bg-green-500 shadow-[0_0_8px_#22c55e]" :
+                    wsStatus === 'connecting' ? "bg-amber-500 animate-pulse" :
+                    "bg-rose-500"
+                  )}
+                  title={
+                    wsStatus === 'connected' ? "Live Connected" :
+                    wsStatus === 'connecting' ? "Connecting..." :
+                    "Disconnected (Polling Fallback)"
+                  }
+                />
+              )}
+            </div>
+            <div className="flex items-center mt-1 flex-wrap">
+              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                Smart AC Controller
+                {initialized && !showOnboarding && (
+                  <span className="text-[10px] ml-1 text-slate-400 font-normal">
+                    ({wsStatus === 'connected' ? 'live' : wsStatus === 'connecting' ? 'connecting' : 'polling'})
+                  </span>
+                )}
+              </p>
+              <div className="flex sm:hidden">
+                <WeatherWidget variant="inline" />
+              </div>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3">

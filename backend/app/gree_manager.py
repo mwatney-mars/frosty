@@ -15,6 +15,9 @@ class GreeManager:
         self.devices: Dict[str, Device] = {} # Keyed by MAC
         self.device_info: Dict[str, DeviceInfo] = {} # Keyed by MAC
         self._last_scan_results: List[DeviceInfo] = []
+        self.custom_names: Dict[str, str] = {} # Keyed by MAC (Cache)
+        self.names_loaded = False
+        self.failed_pings: Dict[str, int] = {} # Keyed by MAC (Consecutive failures)
 
     def _get_discovery(self):
         if self._discovery is None:
@@ -22,11 +25,17 @@ class GreeManager:
         return self._discovery
 
     def get_custom_name(self, mac: str) -> Optional[str]:
-        db = SessionLocal()
-        try:
-            return get_device_name(db, mac)
-        finally:
-            db.close()
+        if not self.names_loaded:
+            db = SessionLocal()
+            try:
+                for device in get_all_saved_devices(db):
+                    self.custom_names[device.mac] = device.name
+                self.names_loaded = True
+            except Exception as e:
+                logger.error(f"Failed to populate names cache: {e}")
+            finally:
+                db.close()
+        return self.custom_names.get(mac)
 
     async def discover_devices(self):
         """Background discovery to find and bind SAVED devices."""
@@ -96,6 +105,8 @@ class GreeManager:
         db = SessionLocal()
         try:
             add_saved_device(db, mac, name)
+            self.custom_names[mac] = name  # Update cache
+            self.failed_pings[mac] = 0     # Initialize error count
         finally:
             db.close()
             
@@ -122,6 +133,8 @@ class GreeManager:
         db = SessionLocal()
         try:
             delete_saved_device(db, mac)
+            self.custom_names.pop(mac, None)  # Update cache
+            self.failed_pings.pop(mac, None)  # Clear consecutive failures
         finally:
             db.close()
         
@@ -147,6 +160,7 @@ class GreeManager:
         
         try:
             await device.update_state()
+            self.failed_pings[mac] = 0 # Reset failures on successful update
             return {
                 "mac": mac,
                 "ip": self.device_info[mac].ip,
@@ -170,23 +184,59 @@ class GreeManager:
             }
         except Exception as e:
             logger.error(f"Failed to update state for {mac}: {e}")
+            self.failed_pings[mac] = self.failed_pings.get(mac, 0) + 1
+            
+            # If failed less than 3 consecutive times, tolerate it and return the last known properties
+            if self.failed_pings[mac] < 3:
+                logger.info(f"Tolerating failure for device {mac} ({self.failed_pings[mac]}/3 failures). Returning cached values.")
+                return {
+                    "mac": mac,
+                    "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown",
+                    "name": custom_name,
+                    "online": True,
+                    "power": device.power,
+                    "target_temperature": device.target_temperature,
+                    "current_temperature": device.current_temperature,
+                    "fan_speed": device.fan_speed,
+                    "mode": device.mode,
+                    "swing_vertical": device.vertical_swing,
+                    "horizontal_swing": device.horizontal_swing,
+                    "quiet": device.quiet,
+                    "turbo": device.turbo,
+                    "light": device.light,
+                    "sleep": device.sleep,
+                    "xfan": device.xfan,
+                    "anion": device.anion,
+                    "power_save": device.power_save,
+                    "steady_heat": device.steady_heat
+                }
+            
+            # 3 or more failures, mark as offline
             return {
                 "mac": mac,
                 "name": custom_name,
                 "online": False,
-                "ip": self.device_info[mac].ip
+                "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown"
             }
 
     async def get_all_states(self) -> List[Dict]:
         """Get states for all SAVED devices in parallel."""
-        db = SessionLocal()
-        saved_devices = get_all_saved_devices(db)
-        db.close()
-        
-        if not saved_devices:
+        # Ensure name cache is populated
+        if not self.names_loaded:
+            db = SessionLocal()
+            try:
+                for device in get_all_saved_devices(db):
+                    self.custom_names[device.mac] = device.name
+                self.names_loaded = True
+            except Exception as e:
+                logger.error(f"Failed to populate names cache: {e}")
+            finally:
+                db.close()
+                
+        if not self.custom_names:
             return []
 
-        tasks = [self.get_device_state(d.mac) for d in saved_devices]
+        tasks = [self.get_device_state(mac) for mac in self.custom_names.keys()]
         states = await asyncio.gather(*tasks)
         
         return [s for s in states if s is not None]
@@ -209,6 +259,7 @@ class GreeManager:
             db = SessionLocal()
             try:
                 add_saved_device(db, mac, new_name)
+                self.custom_names[mac] = new_name  # Update cache
             finally:
                 db.close()
         

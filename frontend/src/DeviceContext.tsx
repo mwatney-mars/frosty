@@ -15,6 +15,7 @@ interface DeviceContextType {
   setError: (err: string | null) => void;
   refreshDevices: (force?: boolean) => Promise<void>;
   refreshAll: () => Promise<void>;
+  wsStatus: 'connecting' | 'connected' | 'disconnected';
 }
 
 const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
@@ -27,6 +28,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [initialized, setInitialized] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
@@ -39,6 +41,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     setInitialized(true);
     setShowOnboarding(false);
     setLoading(false);
+    setWsStatus('disconnected');
     if (wsRef.current) {
       wsRef.current.onclose = null;
       wsRef.current.close();
@@ -110,12 +113,16 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/api/ws?token=${encodeURIComponent(activeToken)}`;
     
     console.log('[WS] Connecting...');
+    setWsStatus('connecting');
     const ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => console.log('[WS] Connected');
+    ws.onopen = () => {
+      console.log('[WS] Connected');
+      setWsStatus('connected');
+    };
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -128,6 +135,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     ws.onclose = (event) => {
       wsRef.current = null;
       console.log(`[WS] Disconnected (code: ${event.code})`);
+      setWsStatus('disconnected');
       if (localStorage.getItem('token')) {
         console.log('[WS] Retrying connection in 5 seconds...');
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
@@ -136,6 +144,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     };
     ws.onerror = (err) => {
         console.error('[WS] Connection error:', err);
+        setWsStatus('disconnected');
         ws.close();
     };
     wsRef.current = ws;
@@ -198,7 +207,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       showOnboarding, setShowOnboarding,
       finishOnboarding,
       error, setError, 
-      refreshDevices, refreshAll 
+      refreshDevices, refreshAll,
+      wsStatus
     }}>
       {children}
     </DeviceContext.Provider>

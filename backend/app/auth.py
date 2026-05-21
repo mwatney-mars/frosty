@@ -36,8 +36,8 @@ def get_secret_key():
             f.write(new_key)
     except Exception as e:
         print(f"Warning: Could not save secret key to {key_path}: {e}")
-        # Fallback to default for compatibility, though not ideal
-        return "frosty-secret-key-change-me-in-production"
+        # Fallback to a runtime-only random key rather than a hardcoded weak key
+        return secrets.token_urlsafe(64)
         
     return new_key
 

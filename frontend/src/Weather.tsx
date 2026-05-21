@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Cloud, Sun, MapPin, Loader2 } from 'lucide-react';
 
-export default function WeatherWidget() {
+interface WeatherWidgetProps {
+  variant?: 'standard' | 'inline';
+}
+
+export default function WeatherWidget({ variant = 'standard' }: WeatherWidgetProps) {
   const [weather, setWeather] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -53,8 +57,17 @@ export default function WeatherWidget() {
 
   if (!weather) return null;
 
+  if (variant === 'inline') {
+    return (
+      <div className="flex items-center gap-1 text-xs text-amber-500 font-bold border-l border-slate-300 dark:border-slate-600 pl-2 ml-1">
+        {weather.isDay ? <Sun className="w-3.5 h-3.5" /> : <Cloud className="w-3.5 h-3.5" />}
+        <span>{weather.temp}°C</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-3 text-sm bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl px-3 py-1.5 shadow-sm">
+    <div className="hidden sm:flex items-center gap-3 text-sm bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl px-3 py-1.5 shadow-sm">
       <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
         <MapPin className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">{weather.city}</span>
