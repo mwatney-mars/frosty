@@ -140,6 +140,7 @@ class DeviceState(BaseModel):
     anion: Optional[bool] = None
     power_save: Optional[bool] = None
     steady_heat: Optional[bool] = None
+    mute_beep: Optional[bool] = None
 
 class DeviceUpdate(BaseModel):
     name: Optional[str] = None
@@ -157,6 +158,7 @@ class DeviceUpdate(BaseModel):
     anion: Optional[bool] = None
     power_save: Optional[bool] = None
     steady_heat: Optional[bool] = None
+    mute_beep: Optional[bool] = None
 
 class DeviceSaveRequest(BaseModel):
     mac: str

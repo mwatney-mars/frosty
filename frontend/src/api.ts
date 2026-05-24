@@ -20,6 +20,7 @@ export interface DeviceState {
   anion?: boolean;
   power_save?: boolean;
   steady_heat?: boolean;
+  mute_beep?: boolean;
 }
 
 export interface DiscoveredDevice {

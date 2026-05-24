@@ -140,7 +140,7 @@ export default function Settings() {
 
             <div className="mt-8 text-center text-slate-500 dark:text-slate-400">
               <p className="font-medium text-sm">Frosty Smart AC Controller</p>
-              <p className="font-mono text-xs mt-1">Version 1.0.3</p>
+              <p className="font-mono text-xs mt-1">Version 1.0.4</p>
             </div>
           </div>
         ) : (

@@ -16,6 +16,7 @@ class GreeManager:
         self.device_info: Dict[str, DeviceInfo] = {} # Keyed by MAC
         self._last_scan_results: List[DeviceInfo] = []
         self.custom_names: Dict[str, str] = {} # Keyed by MAC (Cache)
+        self.mute_beeps: Dict[str, bool] = {} # Keyed by MAC (Cache)
         self.names_loaded = False
         self.failed_pings: Dict[str, int] = {} # Keyed by MAC (Consecutive failures)
 
@@ -30,12 +31,17 @@ class GreeManager:
             try:
                 for device in get_all_saved_devices(db):
                     self.custom_names[device.mac] = device.name
+                    self.mute_beeps[device.mac] = getattr(device, "mute_beep", False)
                 self.names_loaded = True
             except Exception as e:
                 logger.error(f"Failed to populate names cache: {e}")
             finally:
                 db.close()
         return self.custom_names.get(mac)
+
+    def is_beep_muted(self, mac: str) -> bool:
+        _ = self.get_custom_name(mac)
+        return self.mute_beeps.get(mac, False)
 
     async def discover_devices(self):
         """Background discovery to find and bind SAVED devices."""
@@ -149,13 +155,16 @@ class GreeManager:
         if not custom_name:
             return None # Not a saved device
 
+        mute_beep = self.mute_beeps.get(mac, False)
+
         device = self.devices.get(mac)
         if not device:
             return {
                 "mac": mac,
                 "name": custom_name,
                 "online": False,
-                "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown"
+                "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown",
+                "mute_beep": mute_beep
             }
         
         try:
@@ -180,7 +189,8 @@ class GreeManager:
                 "xfan": device.xfan,
                 "anion": device.anion,
                 "power_save": device.power_save,
-                "steady_heat": device.steady_heat
+                "steady_heat": device.steady_heat,
+                "mute_beep": mute_beep
             }
         except Exception as e:
             logger.error(f"Failed to update state for {mac}: {e}")
@@ -208,7 +218,8 @@ class GreeManager:
                     "xfan": device.xfan,
                     "anion": device.anion,
                     "power_save": device.power_save,
-                    "steady_heat": device.steady_heat
+                    "steady_heat": device.steady_heat,
+                    "mute_beep": mute_beep
                 }
             
             # 3 or more failures, mark as offline
@@ -216,7 +227,8 @@ class GreeManager:
                 "mac": mac,
                 "name": custom_name,
                 "online": False,
-                "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown"
+                "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown",
+                "mute_beep": mute_beep
             }
 
     async def get_all_states(self) -> List[Dict]:
@@ -227,6 +239,7 @@ class GreeManager:
             try:
                 for device in get_all_saved_devices(db):
                     self.custom_names[device.mac] = device.name
+                    self.mute_beeps[device.mac] = getattr(device, "mute_beep", False)
                 self.names_loaded = True
             except Exception as e:
                 logger.error(f"Failed to populate names cache: {e}")
@@ -254,12 +267,16 @@ class GreeManager:
                     device = self.devices.get(mac)
                     break
 
-        if "name" in updates:
-            new_name = updates.pop("name")
+        if "name" in updates or "mute_beep" in updates:
+            new_name = updates.pop("name", None)
+            new_mute_beep = updates.pop("mute_beep", None)
             db = SessionLocal()
             try:
-                add_saved_device(db, mac, new_name)
-                self.custom_names[mac] = new_name  # Update cache
+                add_saved_device(db, mac, name=new_name, mute_beep=new_mute_beep)
+                if new_name is not None:
+                    self.custom_names[mac] = new_name
+                if new_mute_beep is not None:
+                    self.mute_beeps[mac] = new_mute_beep
             finally:
                 db.close()
         
@@ -274,3 +291,43 @@ class GreeManager:
                 await device.push_state_update()
 
 gree_manager = GreeManager()
+
+# Dynamically patch greeclimate Device.push_state_update to inject Buzzer_ON_OFF if device is silenced
+from greeclimate.device import Device, Props, DeviceTimeoutError
+
+original_push_state_update = Device.push_state_update
+
+async def patched_push_state_update(self):
+    """Patched push_state_update to inject Buzzer_ON_OFF if device is silenced."""
+    if not self._dirty:
+        return
+
+    if not self.device_cipher:
+        await self.bind()
+
+    self._logger.debug("Pushing state updates to (%s)", str(self.device_info))
+
+    props = {}
+    for name in self._dirty:
+        value = self._properties.get(name)
+        self._logger.debug("Sending remote state update %s -> %s", name, value)
+        props[name] = value
+        if name == Props.TEMP_SET.value:
+            props[Props.TEMP_BIT.value] = self._properties.get(Props.TEMP_BIT.value)
+            props[Props.TEMP_UNIT.value] = self._properties.get(
+                Props.TEMP_UNIT.value
+            )
+
+    # Inject Buzzer_ON_OFF if mute_beep is enabled for this device
+    mac = self.device_info.mac
+    if gree_manager.is_beep_muted(mac):
+        props["Buzzer_ON_OFF"] = 1
+
+    try:
+        await self.send(self.create_command_message(self.device_info, **props))
+    except asyncio.TimeoutError:
+        raise DeviceTimeoutError
+    else:
+        self._dirty.clear()
+
+Device.push_state_update = patched_push_state_update

@@ -64,6 +64,7 @@ const TOGGLES = [
   { key: 'anion', label: 'Health (Anion)', type: 'bool' },
   { key: 'power_save', label: 'Power Save', type: 'bool' },
   { key: 'steady_heat', label: 'Steady Heat', type: 'bool' },
+  { key: 'mute_beep', label: 'Silence Beep', type: 'bool' },
 ] as const;
 
 export default function App() {

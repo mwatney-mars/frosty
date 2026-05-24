@@ -28,6 +28,7 @@ class DBDeviceName(Base):
 
     mac = Column(String, primary_key=True, index=True)
     name = Column(String)
+    mute_beep = Column(Boolean, default=False)
 
 def get_all_saved_devices(db):
     return db.query(DBDeviceName).all()
@@ -36,12 +37,15 @@ def get_device_name(db, mac):
     device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
     return device.name if device else None
 
-def add_saved_device(db, mac, name):
+def add_saved_device(db, mac, name=None, mute_beep=None):
     device = db.query(DBDeviceName).filter(DBDeviceName.mac == mac).first()
     if device:
-        device.name = name
+        if name is not None:
+            device.name = name
+        if mute_beep is not None:
+            device.mute_beep = mute_beep
     else:
-        device = DBDeviceName(mac=mac, name=name)
+        device = DBDeviceName(mac=mac, name=name or "Gree AC", mute_beep=mute_beep if mute_beep is not None else False)
         db.add(device)
     db.commit()
     return device
@@ -61,6 +65,18 @@ def init_db():
         os.makedirs(db_dir, exist_ok=True)
         
     Base.metadata.create_all(bind=engine)
+    
+    # Check and perform migration for mute_beep column
+    try:
+        with engine.begin() as conn:
+            cursor = conn.execute("PRAGMA table_info(device_names)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "mute_beep" not in columns:
+                conn.execute("ALTER TABLE device_names ADD COLUMN mute_beep BOOLEAN DEFAULT 0")
+                print("Successfully added mute_beep column to device_names table")
+    except Exception as e:
+        print(f"Migration error: {e}")
+        
     db = SessionLocal()
     # Create default admin if not exists
     admin = db.query(DBUser).filter(DBUser.username == "admin").first()
