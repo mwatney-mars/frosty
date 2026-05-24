@@ -16,7 +16,9 @@ import {
   Check,
   LogOut,
   AlertCircle,
-  Settings
+  Settings,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { 
   discoverDevices, 
@@ -64,7 +66,6 @@ const TOGGLES = [
   { key: 'anion', label: 'Health (Anion)', type: 'bool' },
   { key: 'power_save', label: 'Power Save', type: 'bool' },
   { key: 'steady_heat', label: 'Steady Heat', type: 'bool' },
-  { key: 'mute_beep', label: 'Silence Beep', type: 'bool' },
 ] as const;
 
 export default function App() {
@@ -507,18 +508,50 @@ export default function App() {
                       </p>
                     </div>
                     
-                    <button 
-                      onClick={() => updateSetting(activeDevice.mac, { power: !activeDevice.power })}
-                      disabled={!activeDevice.online}
-                      className={cn(
-                        "p-4 md:p-5 rounded-2xl transition-all duration-300 shrink-0 border ml-4",
-                        activeDevice.online && activeDevice.power 
-                          ? "bg-green-500 border-green-500 text-white shadow-[0_8px_16px_-6px_rgba(34,197,94,0.5)]" 
-                          : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800"
-                      )}
-                    >
-                      <Power className="w-8 h-8 md:w-10 md:h-10" />
-                    </button>
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      {/* Silence Beep Switch */}
+                      <div className="flex items-center gap-2 bg-slate-100/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-2xl h-12 md:h-[60px] transition-colors duration-300">
+                        <span className="text-[10px] md:text-xs uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 select-none">Beep</span>
+                        <button
+                          onClick={() => updateSetting(activeDevice.mac, { mute_beep: !activeDevice.mute_beep })}
+                          disabled={!activeDevice.online}
+                          className={cn(
+                            "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 relative shrink-0",
+                            activeDevice.mute_beep 
+                              ? "bg-indigo-500" 
+                              : "bg-slate-200 dark:bg-slate-700"
+                          )}
+                          aria-label="Silence Beep"
+                        >
+                          <div
+                            className={cn(
+                              "w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform duration-200 flex items-center justify-center absolute left-0.5 top-0.5",
+                              activeDevice.mute_beep ? "translate-x-5" : "translate-x-0"
+                            )}
+                          >
+                            {activeDevice.mute_beep ? (
+                              <VolumeX className="w-3 h-3 text-indigo-500" />
+                            ) : (
+                              <Volume2 className="w-3 h-3 text-slate-400" />
+                            )}
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Power Button */}
+                      <button 
+                        onClick={() => updateSetting(activeDevice.mac, { power: !activeDevice.power })}
+                        disabled={!activeDevice.online}
+                        className={cn(
+                          "p-3 md:p-4 rounded-2xl transition-all duration-300 border h-12 w-12 md:h-[60px] md:w-[60px] flex items-center justify-center shrink-0",
+                          activeDevice.online && activeDevice.power 
+                            ? "bg-green-500 border-green-500 text-white shadow-[0_8px_16px_-6px_rgba(34,197,94,0.5)]" 
+                            : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800"
+                        )}
+                      >
+                        <Power className="w-6 h-6 md:w-8 md:h-8" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-10">
