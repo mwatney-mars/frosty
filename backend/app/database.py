@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import bcrypt
@@ -69,10 +69,10 @@ def init_db():
     # Check and perform migration for mute_beep column
     try:
         with engine.begin() as conn:
-            cursor = conn.execute("PRAGMA table_info(device_names)")
+            cursor = conn.execute(text("PRAGMA table_info(device_names)"))
             columns = [row[1] for row in cursor.fetchall()]
             if "mute_beep" not in columns:
-                conn.execute("ALTER TABLE device_names ADD COLUMN mute_beep BOOLEAN DEFAULT 0")
+                conn.execute(text("ALTER TABLE device_names ADD COLUMN mute_beep BOOLEAN DEFAULT 0"))
                 print("Successfully added mute_beep column to device_names table")
     except Exception as e:
         print(f"Migration error: {e}")
