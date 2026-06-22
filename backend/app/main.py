@@ -126,8 +126,8 @@ class DeviceState(BaseModel):
     name: str
     online: bool
     power: Optional[bool] = None
-    target_temperature: Optional[int] = None
-    current_temperature: Optional[int] = None
+    target_temperature: Optional[float] = None
+    current_temperature: Optional[float] = None
     fan_speed: Optional[int] = None
     mode: Optional[int] = None
     swing_vertical: Optional[int] = None
@@ -145,7 +145,7 @@ class DeviceState(BaseModel):
 class DeviceUpdate(BaseModel):
     name: Optional[str] = None
     power: Optional[bool] = None
-    target_temperature: Optional[int] = None
+    target_temperature: Optional[float] = None
     fan_speed: Optional[int] = None
     mode: Optional[int] = None
     swing_vertical: Optional[int] = None
@@ -174,7 +174,7 @@ class PowerRequest(BaseModel):
     power: bool
 
 class TemperatureRequest(BaseModel):
-    temperature: int
+    temperature: float
 
 class FanSpeedRequest(BaseModel):
     fan_speed: int

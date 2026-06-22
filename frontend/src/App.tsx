@@ -581,13 +581,13 @@ export default function App() {
                             </span>
                             <div className="flex flex-col gap-1.5 ml-2">
                               <button 
-                                onClick={() => activeDevice.target_temperature !== undefined && updateSetting(activeDevice.mac, { target_temperature: activeDevice.target_temperature + 1 })}
+                                onClick={() => activeDevice.target_temperature !== undefined && updateSetting(activeDevice.mac, { target_temperature: Math.round((activeDevice.target_temperature + 0.5) * 2) / 2 })}
                                 className="p-2 hover:bg-indigo-200 dark:hover:bg-indigo-800 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl text-indigo-700 dark:text-indigo-300 transition-colors active:scale-95"
                               >
                                 <Plus className="w-5 h-5" />
                               </button>
                               <button 
-                                onClick={() => activeDevice.target_temperature !== undefined && updateSetting(activeDevice.mac, { target_temperature: activeDevice.target_temperature - 1 })}
+                                onClick={() => activeDevice.target_temperature !== undefined && updateSetting(activeDevice.mac, { target_temperature: Math.round((activeDevice.target_temperature - 0.5) * 2) / 2 })}
                                 className="p-2 hover:bg-indigo-200 dark:hover:bg-indigo-800 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl text-indigo-700 dark:text-indigo-300 transition-colors active:scale-95"
                               >
                                 <Minus className="w-5 h-5" />

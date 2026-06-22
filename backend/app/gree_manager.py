@@ -293,7 +293,7 @@ class GreeManager:
 gree_manager = GreeManager()
 
 # Dynamically patch greeclimate Device.push_state_update to inject Buzzer_ON_OFF if device is silenced
-from greeclimate.device import Device, Props, DeviceTimeoutError
+from greeclimate.device import Device, Props, DeviceTimeoutError, generate_temperature_record, TEMP_MIN, TEMP_MAX
 
 original_push_state_update = Device.push_state_update
 
@@ -335,3 +335,66 @@ async def patched_push_state_update(self):
         self._dirty.clear()
 
 Device.push_state_update = patched_push_state_update
+
+
+# Overwrite/monkeypatch target_temperature and current_temperature properties on Device class to support float Celsius values
+def patched_get_target_temperature(self) -> Optional[float]:
+    temset = self.get_property(Props.TEMP_SET)
+    temrec = self.get_property(Props.TEMP_BIT)
+    if temset is None:
+        return None
+    if self.temperature_units == 1: # Fahrenheit
+        return float(self._convert_to_units(temset, temrec if temrec is not None else 0))
+    # Celsius: if TemRec (Props.TEMP_BIT) is 1, it means a .5 half-degree is added
+    if temrec == 1:
+        return temset + 0.5
+    return float(temset)
+
+def patched_set_target_temperature(self, value: float):
+    def validate(val):
+        if val > TEMP_MAX or val < TEMP_MIN:
+            raise ValueError(f"Specified temperature {val} is out of range.")
+            
+    if self.temperature_units == 1:
+        rec = generate_temperature_record(value)
+        validate(rec["temSet"])
+        self.set_property(Props.TEMP_SET, rec["temSet"])
+        self.set_property(Props.TEMP_BIT, rec["temRec"])
+    else:
+        # Round value to nearest 0.5 for Celsius
+        value = round(value * 2) / 2
+        validate(value)
+        int_val = int(value)
+        frac = value - int_val
+        temrec = 1 if frac >= 0.4 else 0
+        self.set_property(Props.TEMP_SET, int_val)
+        self.set_property(Props.TEMP_BIT, temrec)
+
+def patched_get_current_temperature(self) -> Optional[float]:
+    prop = self.get_property(Props.TEMP_SENSOR)
+    bit = self.get_property(Props.TEMP_BIT)
+    if prop is not None:
+        bit = bit if bit is not None else 0
+        v = self.version and int(self.version.split(".")[0])
+        try:
+            if v == 4:
+                val = self._convert_to_units(prop, bit)
+            elif prop != 0:
+                val = self._convert_to_units(prop - 40, bit) # TEMP_OFFSET = 40
+            else:
+                val = None
+                
+            if val is not None:
+                if self.temperature_units == 1:
+                    return float(val)
+                # Celsius: Room temperature from sensor is typically integer-only, but cast to float for consistency
+                return float(val)
+        except ValueError:
+            logging.warning("Converting unexpected set temperature value %s", prop)
+
+    target = self.target_temperature
+    return float(target) if target is not None else None
+
+Device.target_temperature = property(patched_get_target_temperature, patched_set_target_temperature)
+Device.current_temperature = property(patched_get_current_temperature)
+
