@@ -13,6 +13,10 @@ Frosty gives you a beautiful dashboard to control all your Gree AC units from an
 - 🔒 **Secure Multi-User**: Built-in authentication with Admin and User roles.
 - 💾 **Persistent Naming**: Give your units custom names (e.g., "Living Room") that survive DHCP IP changes.
 
+## What's New 🚀
+- 🌡️ **0.5°C Temperature Steps (v1.0.8)**: Celsius mode now supports precise half-degree target adjustments (e.g., `21.5°C`) by encoding/decoding using the standard Gree protocol's `TemRec` bit.
+- 🔇 **Firmware v1.45 Mute Support (v1.0.7)**: Added dual-buzzer command injection supporting silent settings adjustments on the newly upgraded Gree v1.45 firmwares while retaining full compatibility with older v1.31 firmware.
+
 ---
 
 ## 🐳 Quick Start (Docker)
