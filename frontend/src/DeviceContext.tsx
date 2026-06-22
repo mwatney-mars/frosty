@@ -4,6 +4,7 @@ import { fetchDevices, fetchMe, logout, type DeviceState, type User } from './ap
 interface DeviceContextType {
   devices: DeviceState[];
   setDevices: React.Dispatch<React.SetStateAction<DeviceState[]>>;
+  addPendingUpdate: (mac: string, updates: Partial<DeviceState>) => void;
   user: User | null;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   loading: boolean;
@@ -21,7 +22,7 @@ interface DeviceContextType {
 const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
 
 export function DeviceProvider({ children }: { children: React.ReactNode }) {
-  const [devices, setDevices] = useState<DeviceState[]>([]);
+  const [devices, setDevicesInternal] = useState<DeviceState[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [loading, setLoading] = useState(false);
@@ -30,8 +31,49 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   
+  const pendingUpdatesRef = useRef<Record<string, Record<string, { value: any; timestamp: number }>>>({});
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
+
+  const applyPendingUpdates = useCallback((currentDevices: DeviceState[]) => {
+    const now = Date.now();
+    const expiry = 2500; // 2.5 seconds threshold
+
+    return currentDevices.map(device => {
+      const devicePending = pendingUpdatesRef.current[device.mac];
+      if (!devicePending) return device;
+
+      const mergedDevice = { ...device };
+      Object.entries(devicePending).forEach(([key, item]) => {
+        if (now - item.timestamp < expiry) {
+          (mergedDevice as any)[key] = item.value;
+        } else {
+          delete devicePending[key];
+        }
+      });
+
+      return mergedDevice;
+    });
+  }, []);
+
+  const setDevices = useCallback((value: React.SetStateAction<DeviceState[]>) => {
+    setDevicesInternal(prev => {
+      const resolved = typeof value === 'function' ? (value as any)(prev) : value;
+      return applyPendingUpdates(resolved);
+    });
+  }, [applyPendingUpdates]);
+
+  const addPendingUpdate = useCallback((mac: string, updates: Partial<DeviceState>) => {
+    const now = Date.now();
+    if (!pendingUpdatesRef.current[mac]) {
+      pendingUpdatesRef.current[mac] = {};
+    }
+    Object.entries(updates).forEach(([key, value]) => {
+      pendingUpdatesRef.current[mac][key] = { value, timestamp: now };
+    });
+
+    setDevicesInternal(prev => applyPendingUpdates(prev));
+  }, [applyPendingUpdates]);
 
   const performLogout = useCallback(() => {
     logout();
@@ -202,6 +244,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   return (
     <DeviceContext.Provider value={{ 
       devices, setDevices, 
+      addPendingUpdate,
       user, setUser, 
       loading, initialized, 
       showOnboarding, setShowOnboarding,

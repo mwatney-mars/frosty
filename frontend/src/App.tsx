@@ -71,7 +71,7 @@ const TOGGLES = [
 export default function App() {
   const { 
     devices, 
-    setDevices,
+    addPendingUpdate,
     user, 
     setUser, 
     initialized, 
@@ -143,18 +143,15 @@ export default function App() {
   };
 
   const updateSetting = async (mac: string, updates: Partial<DeviceState>) => {
-    // Optimistic UI Update
-    setDevices(prev => prev.map(d => 
-      d.mac === mac ? { ...d, ...updates } : d
-    ));
+    // Register optimistic pending updates to prevent state flickering
+    addPendingUpdate(mac, updates);
 
     try {
       await updateDevice(mac, updates);
       // Wait slightly for the AC unit to process the UDP packet before fetching the real state
-      setTimeout(() => refreshDevices(true), 1000);
+      setTimeout(() => refreshDevices(true), 1200);
     } catch (err) {
       setError('Failed to update device settings');
-      // Revert will happen naturally on the next poll/refresh
       refreshDevices(true);
     }
   };

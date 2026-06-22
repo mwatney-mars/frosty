@@ -43,7 +43,7 @@ def get_secret_key():
 
 SECRET_KEY = get_secret_key()
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 week
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 365 # 1 year
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
 
