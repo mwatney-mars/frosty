@@ -14,8 +14,11 @@ Frosty gives you a beautiful dashboard to control all your Gree AC units from an
 - 💾 **Persistent Naming**: Give your units custom names (e.g., "Living Room") that survive DHCP IP changes.
 
 ## What's New 🚀
+- 🔄 **Anti-Flicker Pending Updates Cache (v1.0.10)**: Implemented a robust backend-side setting cache that tracks requested settings for 4 seconds during updates. This completely eliminates UI state flickering during WebSocket state broadcasts or HTTP status polls while slow-responding physical AC units process changes.
+- 🔑 **1-Year Session Persistence (v1.0.9)**: Extended the user login session expiration limit to 1 year so you stay logged in and don't need to re-authenticate constantly.
 - 🌡️ **0.5°C Temperature Steps (v1.0.8)**: Celsius mode now supports precise half-degree target adjustments (e.g., `21.5°C`) by encoding/decoding using the standard Gree protocol's `TemRec` bit.
 - 🔇 **Firmware v1.45 Mute Support (v1.0.7)**: Added dual-buzzer command injection supporting silent settings adjustments on the newly upgraded Gree v1.45 firmwares while retaining full compatibility with older v1.31 firmware.
+
 
 ---
 

@@ -19,6 +19,7 @@ class GreeManager:
         self.mute_beeps: Dict[str, bool] = {} # Keyed by MAC (Cache)
         self.names_loaded = False
         self.failed_pings: Dict[str, int] = {} # Keyed by MAC (Consecutive failures)
+        self.pending_updates: Dict[str, Dict[str, tuple]] = {} # Keyed by MAC, then property name -> (value, timestamp)
 
     def _get_discovery(self):
         if self._discovery is None:
@@ -167,10 +168,11 @@ class GreeManager:
                 "mute_beep": mute_beep
             }
         
+        state = None
         try:
             await device.update_state()
             self.failed_pings[mac] = 0 # Reset failures on successful update
-            return {
+            state = {
                 "mac": mac,
                 "ip": self.device_info[mac].ip,
                 "name": custom_name,
@@ -199,7 +201,7 @@ class GreeManager:
             # If failed less than 3 consecutive times, tolerate it and return the last known properties
             if self.failed_pings[mac] < 3:
                 logger.info(f"Tolerating failure for device {mac} ({self.failed_pings[mac]}/3 failures). Returning cached values.")
-                return {
+                state = {
                     "mac": mac,
                     "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown",
                     "name": custom_name,
@@ -221,15 +223,29 @@ class GreeManager:
                     "steady_heat": device.steady_heat,
                     "mute_beep": mute_beep
                 }
-            
-            # 3 or more failures, mark as offline
-            return {
-                "mac": mac,
-                "name": custom_name,
-                "online": False,
-                "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown",
-                "mute_beep": mute_beep
-            }
+            else:
+                # 3 or more failures, mark as offline
+                return {
+                    "mac": mac,
+                    "name": custom_name,
+                    "online": False,
+                    "ip": self.device_info[mac].ip if mac in self.device_info else "Unknown",
+                    "mute_beep": mute_beep
+                }
+
+        # Apply pending backend updates to prevent state flickering
+        import time
+        now = time.time()
+        device_pending = self.pending_updates.get(mac)
+        if device_pending:
+            for key, (value, timestamp) in list(device_pending.items()):
+                if now - timestamp < 4.0:
+                    state[key] = value
+                else:
+                    device_pending.pop(key, None)
+
+        return state
+
 
     async def get_all_states(self) -> List[Dict]:
         """Get states for all SAVED devices in parallel."""
@@ -281,6 +297,14 @@ class GreeManager:
                 db.close()
         
         if device:
+            # Track pending updates on the backend to prevent state flickering
+            import time
+            now = time.time()
+            if mac not in self.pending_updates:
+                self.pending_updates[mac] = {}
+            for key, value in updates.items():
+                self.pending_updates[mac][key] = (value, now)
+
             for key, value in updates.items():
                 if key == "swing_vertical":
                     device.vertical_swing = value
@@ -289,6 +313,7 @@ class GreeManager:
             
             if updates:
                 await device.push_state_update()
+
 
 gree_manager = GreeManager()
 
