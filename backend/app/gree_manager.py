@@ -318,10 +318,14 @@ async def patched_push_state_update(self):
                 Props.TEMP_UNIT.value
             )
 
-    # Inject Buzzer_ON_OFF if mute_beep is enabled for this device
+    # Inject Buzzer control properties based on the mute_beep setting
     mac = self.device_info.mac
     if gree_manager.is_beep_muted(mac):
         props["Buzzer_ON_OFF"] = 1
+        props["BuzzerCtrl"] = 0
+    else:
+        props["Buzzer_ON_OFF"] = 0
+        props["BuzzerCtrl"] = 1
 
     try:
         await self.send(self.create_command_message(self.device_info, **props))
