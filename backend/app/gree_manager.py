@@ -423,3 +423,32 @@ def patched_get_current_temperature(self) -> Optional[float]:
 Device.target_temperature = property(patched_get_target_temperature, patched_set_target_temperature)
 Device.current_temperature = property(patched_get_current_temperature)
 
+
+# Dynamically patch greeclimate Discovery.search_devices to pre-initialize the discovery transport,
+# completely preventing event loop/socket race conditions when concurrently scanning multiple target IPs.
+from greeclimate.discovery import Discovery
+
+original_search_devices = Discovery.search_devices
+
+async def patched_search_devices(self, broadcastAddrs: list = None) -> None:
+    """Patched search_devices to pre-initialize the datagram endpoint sequentially before parallel execution."""
+    if not broadcastAddrs:
+        broadcastAddrs = self._get_broadcast_addresses()
+
+    if self._transport is None:
+        try:
+            self._transport, _ = await self._loop.create_datagram_endpoint(
+                lambda: self, local_addr=("0.0.0.0", 0), allow_broadcast=True
+            )
+            logger.info("Pre-initialized discovery datagram transport successfully.")
+        except Exception as e:
+            logger.error(f"Failed to pre-initialize discovery transport: {e}")
+
+    await asyncio.gather(
+        *[asyncio.create_task(self.search_on_interface(b)) for b in broadcastAddrs],
+        return_exceptions=True
+    )
+
+Discovery.search_devices = patched_search_devices
+
+
