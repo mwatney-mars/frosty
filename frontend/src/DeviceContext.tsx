@@ -121,12 +121,17 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setLoading(true);
-      const [devicesData, userData] = await Promise.all([
-        fetchDevices(),
-        fetchMe()
-      ]);
-      setDevices(devicesData);
+      const userData = await fetchMe();
       setUser(userData);
+
+      if (userData.requires_password_change) {
+        setError(null);
+        setDevices([]);
+        return;
+      }
+
+      const devicesData = await fetchDevices();
+      setDevices(devicesData);
       setError(null);
       
       // Initial trigger for fresh installs
