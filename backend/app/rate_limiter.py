@@ -42,6 +42,15 @@ class InMemoryRateLimiter:
             self._records[key] = timestamps
             return True
 
+def get_client_ip(request: Request) -> str:
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip.strip()
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
 limiter = InMemoryRateLimiter()
 
 def rate_limit(max_requests: int, window_seconds: float):
@@ -49,7 +58,7 @@ def rate_limit(max_requests: int, window_seconds: float):
     FastAPI dependency to rate limit by client IP.
     """
     async def dependency(request: Request):
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = get_client_ip(request)
         endpoint_key = f"{client_ip}:{request.url.path}"
         
         allowed = await limiter.check_rate_limit(endpoint_key, max_requests, window_seconds)

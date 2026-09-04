@@ -40,7 +40,14 @@ from .database import init_db, get_db
 # Initialize database
 init_db()
 
-app = FastAPI(title="Gree AC Controller API")
+docs_enabled = os.getenv("ENABLE_DOCS", "false").lower() == "true"
+
+app = FastAPI(
+    title="Gree AC Controller API",
+    docs_url="/docs" if docs_enabled else None,
+    redoc_url="/redoc" if docs_enabled else None,
+    openapi_url="/openapi.json" if docs_enabled else None,
+)
 
 # HTTP Security Headers Middleware
 @app.middleware("http")
@@ -51,6 +58,13 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    
+    # Prevent caching of API responses
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
@@ -250,7 +264,7 @@ async def delete_device(mac: str, current_user: User = Depends(get_active_user))
     await gree_manager.remove_saved_device(mac)
     return {"status": "success"}
 
-@app.get("/api/discover", response_model=List[DiscoveredDevice])
+@app.get("/api/discover", response_model=List[DiscoveredDevice], dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60))])
 async def discover_new_devices(current_user: User = Depends(get_active_user)):
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Forbidden")
