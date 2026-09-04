@@ -59,21 +59,27 @@ export default function WeatherWidget({ variant = 'standard' }: WeatherWidgetPro
 
   if (variant === 'inline') {
     return (
-      <div className="flex items-center gap-1 text-xs text-amber-500 font-bold border-l border-slate-300 dark:border-slate-600 pl-2 ml-1">
-        {weather.isDay ? <Sun className="w-3.5 h-3.5" /> : <Cloud className="w-3.5 h-3.5" />}
+      <div 
+        className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-bold border-l border-slate-300 dark:border-slate-600 pl-2 ml-1"
+        aria-label={`Outdoor temperature: ${weather.temp} degrees Celsius, ${weather.isDay ? 'Daytime' : 'Night'}`}
+      >
+        {weather.isDay ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Cloud className="w-3.5 h-3.5 text-slate-400" />}
         <span>{weather.temp}°C</span>
       </div>
     );
   }
 
   return (
-    <div className="hidden sm:flex items-center gap-3 text-sm bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl px-3 py-1.5 shadow-sm">
-      <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
-        <MapPin className="w-3.5 h-3.5" />
+    <div 
+      className="hidden sm:flex items-center gap-3 text-sm bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl px-3 py-1.5 shadow-sm"
+      aria-label={`Outside weather: ${weather.city}, ${weather.temp} degrees Celsius, ${weather.isDay ? 'Daytime' : 'Night'}`}
+    >
+      <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200 font-semibold">
+        <MapPin className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
         <span className="hidden sm:inline">{weather.city}</span>
       </div>
       <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>
-      <div className="flex items-center gap-1.5 text-amber-500 dark:text-amber-400 font-bold">
+      <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold">
         {weather.isDay ? <Sun className="w-4 h-4 text-amber-500" /> : <Cloud className="w-4 h-4 text-slate-400" />}
         <span>{weather.temp}°C</span>
       </div>

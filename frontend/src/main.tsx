@@ -7,6 +7,7 @@ import Users from './Users';
 import Settings from './Settings';
 import { ThemeProvider } from './ThemeProvider';
 import { DeviceProvider } from './DeviceContext';
+import { ToastProvider } from './ToastContext';
 import './index.css';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -20,9 +21,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
-      <DeviceProvider>
-        <BrowserRouter>
-          <Routes>
+      <ToastProvider>
+        <DeviceProvider>
+          <BrowserRouter>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route 
               path="/" 
@@ -51,7 +53,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
-      </DeviceProvider>
+        </DeviceProvider>
+      </ToastProvider>
     </ThemeProvider>
   </React.StrictMode>
 );
