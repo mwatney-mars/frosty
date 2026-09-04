@@ -302,16 +302,33 @@ class GreeManager:
             now = time.time()
             if mac not in self.pending_updates:
                 self.pending_updates[mac] = {}
-            for key, value in updates.items():
-                self.pending_updates[mac][key] = (value, now)
 
+            # Strict property setter allowlist to prevent arbitrary attribute injection / DoS
+            allowed_setters = {
+                "power": lambda d, v: setattr(d, "power", bool(v)),
+                "target_temperature": lambda d, v: setattr(d, "target_temperature", float(v)),
+                "fan_speed": lambda d, v: setattr(d, "fan_speed", int(v)),
+                "mode": lambda d, v: setattr(d, "mode", int(v)),
+                "swing_vertical": lambda d, v: setattr(d, "vertical_swing", int(v)),
+                "horizontal_swing": lambda d, v: setattr(d, "horizontal_swing", int(v)),
+                "quiet": lambda d, v: setattr(d, "quiet", int(v)),
+                "turbo": lambda d, v: setattr(d, "turbo", bool(v)),
+                "light": lambda d, v: setattr(d, "light", bool(v)),
+                "sleep": lambda d, v: setattr(d, "sleep", bool(v)),
+                "xfan": lambda d, v: setattr(d, "xfan", bool(v)),
+                "anion": lambda d, v: setattr(d, "anion", bool(v)),
+                "power_save": lambda d, v: setattr(d, "power_save", bool(v)),
+                "steady_heat": lambda d, v: setattr(d, "steady_heat", bool(v)),
+            }
+
+            applied_keys = []
             for key, value in updates.items():
-                if key == "swing_vertical":
-                    device.vertical_swing = value
-                elif hasattr(device, key):
-                    setattr(device, key, value)
+                if key in allowed_setters:
+                    self.pending_updates[mac][key] = (value, now)
+                    allowed_setters[key](device, value)
+                    applied_keys.append(key)
             
-            if updates:
+            if applied_keys:
                 await device.push_state_update()
 
 

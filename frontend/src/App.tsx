@@ -187,23 +187,24 @@ export default function App() {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             const pwd = fd.get('password') as string;
-            if (pwd.length < 5) {
-              alert('Password must be at least 5 characters');
+            if (!pwd || pwd.length < 8) {
+              alert('Password must be at least 8 characters long');
               return;
             }
             try {
               await updateUserInfo(user.username, { password: pwd });
               setUser({ ...user, requires_password_change: false });
-            } catch(err) {
-              alert('Failed to update password');
+            } catch(err: any) {
+              alert(err?.message || 'Failed to update password');
             }
           }} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">New Password</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">New Password (minimum 8 characters)</label>
               <input 
                 name="password" 
                 type="password" 
                 required 
+                minLength={8}
                 className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 placeholder="Enter a secure password..."
               />
