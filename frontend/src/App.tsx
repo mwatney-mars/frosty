@@ -448,7 +448,7 @@ export default function App() {
             {/* Horizontal Device Selector Tabs */}
             {devices.length > 0 && (
               <section aria-label="Discovered AC Units" className="mb-6 shrink-0">
-                <div role="tablist" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                <div role="tablist" className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4">
                   {devices.map(device => {
                     const isSelected = selectedMac === device.mac;
                     return (
@@ -459,50 +459,50 @@ export default function App() {
                         aria-label={`${device.name || 'Gree AC'}, ${device.online ? (device.power ? `Running, target ${device.target_temperature}°C` : 'Standby') : 'Offline'}, current ${device.online ? device.current_temperature : '--'}°C`}
                         onClick={() => setSelectedMac(device.mac)}
                         className={cn(
-                          "flex items-center p-3.5 md:p-4 rounded-2xl border text-left transition-all duration-200 w-full relative overflow-hidden group min-h-[64px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900",
+                          "flex items-center p-2.5 sm:p-3.5 md:p-4 rounded-2xl border text-left transition-all duration-200 w-full relative overflow-hidden group min-h-[58px] sm:min-h-[64px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900",
                           isSelected
                             ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 shadow-sm ring-2 ring-indigo-500/50"
                             : "border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm",
                           !device.online && "opacity-75"
                         )}
                       >
-                        <div className="flex items-center justify-between w-full gap-3">
+                        <div className="flex items-center justify-between w-full gap-2 sm:gap-3">
                           
                           {/* Left: Icon & Info */}
-                          <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
                             <div className={cn(
-                              "flex items-center justify-center w-11 h-11 rounded-2xl shrink-0 transition-colors",
+                              "flex items-center justify-center w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl shrink-0 transition-colors",
                               !device.online 
                                 ? "bg-rose-100 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300"
                                 : device.power 
                                   ? (isSelected ? "bg-indigo-600 text-white shadow-md shadow-indigo-300 dark:shadow-none" : "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300")
                                   : "bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-400"
                             )}>
-                              {!device.online ? <AlertCircle className="w-5 h-5" /> : 
+                              {!device.online ? <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" /> : 
                                device.power ? (
-                                 device.mode === 1 ? <Snowflake className="w-5 h-5" /> :
-                                 device.mode === 2 ? <Droplets className="w-5 h-5" /> :
-                                 device.mode === 3 ? <Fan className="w-5 h-5" /> :
-                                 device.mode === 4 ? <Sun className="w-5 h-5" /> :
-                                 <Thermometer className="w-5 h-5" />
-                              ) : <Power className="w-5 h-5" />}
+                                 device.mode === 1 ? <Snowflake className="w-4 h-4 sm:w-5 sm:h-5" /> :
+                                 device.mode === 2 ? <Droplets className="w-4 h-4 sm:w-5 sm:h-5" /> :
+                                 device.mode === 3 ? <Fan className="w-4 h-4 sm:w-5 sm:h-5" /> :
+                                 device.mode === 4 ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> :
+                                 <Thermometer className="w-4 h-4 sm:w-5 sm:h-5" />
+                              ) : <Power className="w-4 h-4 sm:w-5 sm:h-5" />}
                             </div>
                             
                             <div className="flex flex-col min-w-0">
                               <span className={cn(
-                                "font-bold text-sm md:text-base truncate block leading-tight",
+                                "font-bold text-xs sm:text-sm md:text-base truncate block leading-tight",
                                 isSelected ? "text-indigo-950 dark:text-indigo-100" : "text-slate-900 dark:text-slate-100"
                               )}>
                                 {device.name || 'Gree AC'}
                               </span>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 {!device.online ? (
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800">
+                                  <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/80 px-1 py-0.5 rounded border border-rose-200 dark:border-rose-800">
                                     Offline
                                   </span>
                                 ) : (
                                   <span className={cn(
-                                    "text-xs font-semibold truncate",
+                                    "text-[10px] sm:text-xs font-semibold truncate",
                                     device.power ? "text-indigo-700 dark:text-indigo-300" : "text-slate-500 dark:text-slate-400"
                                   )}>
                                     {device.power ? `Target ${device.target_temperature}°` : 'Standby'}
@@ -513,8 +513,8 @@ export default function App() {
                           </div>
 
                           {/* Right: Current Temp */}
-                          <div className="flex items-center shrink-0 pl-2 border-l border-slate-100 dark:border-slate-700/60">
-                             <div className="text-sm md:text-base font-bold text-slate-700 dark:text-slate-200 w-9 text-right">
+                          <div className="flex items-center shrink-0 pl-1.5 sm:pl-2 border-l border-slate-100 dark:border-slate-700/60">
+                             <div className="text-xs sm:text-sm md:text-base font-bold text-slate-700 dark:text-slate-200 text-right">
                                {device.online ? `${device.current_temperature}°C` : '--'}
                              </div>
                           </div>
@@ -550,11 +550,11 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="p-5 md:p-8 flex-1">
+                <div className="p-4 sm:p-6 md:p-8 flex-1">
                   
                   {/* Pane Header */}
-                  <div className="flex items-start justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-700/60">
-                    <div className="overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8 pb-5 md:pb-6 border-b border-slate-100 dark:border-slate-700/60">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 group">
                         <h2 
                           className={cn("text-2xl md:text-3xl font-bold text-slate-900 dark:text-white truncate", user?.is_admin && "cursor-pointer")} 
@@ -566,7 +566,7 @@ export default function App() {
                         {user?.is_admin && (
                           <button 
                             onClick={() => startRename(activeDevice.mac, activeDevice.name)}
-                            className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                            className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 shrink-0"
                             aria-label={`Rename ${activeDevice.name || 'device'}`}
                           >
                             <Edit2 className="w-5 h-5" />
@@ -574,7 +574,7 @@ export default function App() {
                         )}
                       </div>
                       
-                      <p className="text-slate-500 dark:text-slate-400 text-sm flex items-center gap-2 flex-wrap">
+                      <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm flex items-center gap-2 flex-wrap">
                         <span className="font-mono">{activeDevice.ip}</span>
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" aria-hidden="true" />
                         <span className="font-medium">
@@ -583,9 +583,9 @@ export default function App() {
                       </p>
                     </div>
                     
-                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                    <div className="flex items-center justify-end gap-3 shrink-0">
                       {/* Silence Beep Switch */}
-                      <div className="flex items-center gap-2 bg-slate-100/90 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-2xl h-12 md:h-[52px] transition-colors">
+                      <div className="flex items-center gap-2 bg-slate-100/90 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-2xl h-11 sm:h-12 md:h-[52px] transition-colors">
                         <span id="beep-label" className="text-xs uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 select-none">
                           Beep
                         </span>
@@ -628,64 +628,64 @@ export default function App() {
                         onClick={() => updateSetting(activeDevice.mac, { power: !activeDevice.power })}
                         disabled={!activeDevice.online}
                         className={cn(
-                          "p-3 md:p-3.5 rounded-2xl transition-all duration-300 border h-12 w-12 md:h-[52px] md:w-[52px] flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50",
+                          "p-3 md:p-3.5 rounded-2xl transition-all duration-300 border h-11 w-11 sm:h-12 sm:w-12 md:h-[52px] md:w-[52px] flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50",
                           activeDevice.online && activeDevice.power 
                             ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700" 
                             : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
                         )}
                       >
-                        <Power className="w-6 h-6" />
+                        <Power className="w-5 h-5 sm:w-6 sm:h-6" />
                       </button>
                     </div>
                   </div>
 
                   {/* Controls Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-10">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10">
                     
                     {/* Left Column: Core Controls */}
-                    <div className="lg:col-span-5 space-y-8">
-                      <div className="grid grid-cols-2 gap-4">
+                    <div className="lg:col-span-5 space-y-6 md:space-y-8">
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         {/* Indoor Current Temp */}
-                        <div className="bg-slate-50 dark:bg-slate-900/60 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 flex flex-col justify-center">
-                          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 text-sm mb-3">
+                        <div className="bg-slate-50 dark:bg-slate-900/60 p-4 sm:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 flex flex-col justify-center">
+                          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 text-sm mb-2 sm:mb-3">
                             <Thermometer className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            <span className="font-bold uppercase tracking-wider text-xs">Indoor</span>
+                            <span className="font-bold uppercase tracking-wider text-[11px] sm:text-xs">Indoor</span>
                           </div>
-                          <div className="text-4xl font-extrabold text-slate-900 dark:text-white">
+                          <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
                             {activeDevice.online ? activeDevice.current_temperature : '--'}
-                            <span className="text-2xl text-slate-500 dark:text-slate-400 font-semibold ml-0.5">°C</span>
+                            <span className="text-xl sm:text-2xl text-slate-500 dark:text-slate-400 font-semibold ml-0.5">°C</span>
                           </div>
                         </div>
 
                         {/* Target Temp with Controls */}
-                        <div className="bg-indigo-50/70 dark:bg-indigo-950/40 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-800/40">
-                          <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 text-sm mb-3">
+                        <div className="bg-indigo-50/70 dark:bg-indigo-950/40 p-4 sm:p-5 rounded-2xl border border-indigo-100 dark:border-indigo-800/40">
+                          <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 text-sm mb-2 sm:mb-3">
                             <Settings2 className="w-4 h-4" />
-                            <span className="font-bold uppercase tracking-wider text-xs">Target</span>
+                            <span className="font-bold uppercase tracking-wider text-[11px] sm:text-xs">Target</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-4xl font-extrabold text-indigo-950 dark:text-indigo-100">
+                            <span className="text-3xl sm:text-4xl font-extrabold text-indigo-950 dark:text-indigo-100">
                               {activeDevice.online ? activeDevice.target_temperature : '--'}
-                              <span className="text-2xl text-indigo-500 dark:text-indigo-400 font-semibold ml-0.5">°C</span>
+                              <span className="text-xl sm:text-2xl text-indigo-500 dark:text-indigo-400 font-semibold ml-0.5">°C</span>
                             </span>
-                            <div className="flex flex-col gap-2 ml-2">
+                            <div className="flex flex-col gap-1.5 sm:gap-2 ml-1 sm:ml-2">
                               <button 
                                 type="button"
                                 aria-label="Increase target temperature by 0.5 degrees Celsius"
                                 disabled={!activeDevice.online || activeDevice.target_temperature === undefined || activeDevice.target_temperature >= 30}
                                 onClick={() => activeDevice.target_temperature !== undefined && updateSetting(activeDevice.mac, { target_temperature: Math.min(30, Math.round((activeDevice.target_temperature + 0.5) * 2) / 2) })}
-                                className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-indigo-200 dark:hover:bg-indigo-800 bg-indigo-100 dark:bg-indigo-900/60 rounded-xl text-indigo-800 dark:text-indigo-200 transition-all active:scale-95 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                className="min-h-[40px] min-w-[40px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center hover:bg-indigo-200 dark:hover:bg-indigo-800 bg-indigo-100 dark:bg-indigo-900/60 rounded-xl text-indigo-800 dark:text-indigo-200 transition-all active:scale-95 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                               >
-                                <Plus className="w-5 h-5" />
+                                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                               </button>
                               <button 
                                 type="button"
                                 aria-label="Decrease target temperature by 0.5 degrees Celsius"
                                 disabled={!activeDevice.online || activeDevice.target_temperature === undefined || activeDevice.target_temperature <= 16}
                                 onClick={() => activeDevice.target_temperature !== undefined && updateSetting(activeDevice.mac, { target_temperature: Math.max(16, Math.round((activeDevice.target_temperature - 0.5) * 2) / 2) })}
-                                className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-indigo-200 dark:hover:bg-indigo-800 bg-indigo-100 dark:bg-indigo-900/60 rounded-xl text-indigo-800 dark:text-indigo-200 transition-all active:scale-95 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                className="min-h-[40px] min-w-[40px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center hover:bg-indigo-200 dark:hover:bg-indigo-800 bg-indigo-100 dark:bg-indigo-900/60 rounded-xl text-indigo-800 dark:text-indigo-200 transition-all active:scale-95 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                               >
-                                <Minus className="w-5 h-5" />
+                                <Minus className="w-4 h-4 sm:w-5 sm:h-5" />
                               </button>
                             </div>
                           </div>
@@ -697,7 +697,7 @@ export default function App() {
                         <legend className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-3">
                           Operating Mode
                         </legend>
-                        <div role="radiogroup" aria-label="Operating Mode" className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        <div role="radiogroup" aria-label="Operating Mode" className="grid grid-cols-5 gap-1.5 sm:gap-2">
                           {MODES.map((mode) => {
                             const Icon = mode.icon;
                             const isSelected = activeDevice.mode === mode.value;
@@ -711,14 +711,14 @@ export default function App() {
                                 disabled={!activeDevice.online}
                                 onClick={() => updateSetting(activeDevice.mac, { mode: mode.value })}
                                 className={cn(
-                                  "flex flex-col items-center justify-center gap-2 py-3.5 px-2 text-xs font-bold rounded-2xl border transition-all min-h-[64px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50",
+                                  "flex flex-col items-center justify-center gap-1.5 py-3 px-1 text-[11px] sm:text-xs font-bold rounded-2xl border transition-all min-h-[58px] sm:min-h-[64px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50",
                                   isSelected
                                     ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none"
                                     : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-700/50"
                                 )}
                               >
-                                <Icon className={cn("w-5 h-5", isSelected ? "text-white" : "text-slate-500 dark:text-slate-400")} />
-                                <span>{mode.label}</span>
+                                <Icon className={cn("w-4 h-4 sm:w-5 sm:h-5", isSelected ? "text-white" : "text-slate-500 dark:text-slate-400")} />
+                                <span className="truncate w-full text-center">{mode.label}</span>
                               </button>
                             );
                           })}
